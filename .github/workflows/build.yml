@@ -10,7 +10,7 @@ jobs:
       # prompts so we can do a headless install
     - name: Force non-interactive apt installations
       run: echo 'debconf debconf/frontend select Noninteractive' | debconf-set-selections
-    
+
     - name: Update dependencies
       run: apt-get update
     - name: Install dependencies
@@ -43,7 +43,7 @@ jobs:
 
   simulate:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     container: nimlang/nim
     env:
       HOME: /config

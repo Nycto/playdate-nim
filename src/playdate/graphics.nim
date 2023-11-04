@@ -1,6 +1,6 @@
 {.push raises: [].}
 
-import std/importutils
+import std/[importutils, bitops]
 
 import system
 import bindings/[api, types]
@@ -381,6 +381,53 @@ proc set*(this: var LCDBitmap, x, y: int, color: LCDSolidColor = kColorBlack) =
             mask.set(x, y, kColorWhite)
         var data = this.getData
         data.set(x, y, color)
+
+template eachBitInRow(bitmap: var BitmapData, rowWords: int, exec: untyped) =
+    ## Utility template used by `setMany` that handles iteration over the words in a row of pixels
+    for relativeWordId in 0..<rowWords:
+
+        # The index of the word within the final image
+        let wordId = (y * bitmap.rowbytes) + relativeWordId
+
+        # The actual bits in the word
+        var word {.inject.} = bitmap.data[wordId]
+
+        for relX in 0..<8:
+            let x {.inject.} = (relativeWordId * 8) + relX
+
+            # The coordinate of the bit to manipulate within the word
+            let bitId {.inject.} = 7 - relX
+
+            exec
+
+        bitmap.data[wordId] = word
+
+proc setMany*[W: static int](this: var LCDBitmap, pixels: openarray[array[W, LCDSolidColor]]) =
+    ## Bulk sets an array of pixels. This is faster than individual pixel setting because it allows all the bounds
+    ## checks to be done once.
+
+    static:
+        assert(W mod 8 == 0, "Pixel width must be divisible by 8, but was " & $W)
+
+    var data = this.getData
+    var mask = if this.getBitmapMask.resource == nil: nil else: this.getBitmapMask.getData
+
+    # The number of 8 bit words in each row
+    let rowWords = min(data.width + 7, W) div 8
+
+    for y in 0..<min(data.height, pixels.len):
+        data.eachBitInRow(rowWords):
+            case pixels[y][x]
+            of kColorBlack: word.clearBit(bitId)
+            of kColorWhite: word.setBit(bitId)
+            of kColorClear: assert(mask != nil, "Attempting to set a clear bit on a bitmap without a mask")
+            of kColorXOR: word.flipBit(bitId)
+
+        if mask != nil:
+            mask.eachBitInRow(rowWords):
+                case pixels[y][x]
+                of kColorBlack, kColorWhite, kColorXOR: word.setBit(bitId)
+                of kColorClear: word.clearBit(bitId)
 
 proc setStencilImage*(this: ptr PlaydateGraphics, bitmap: LCDBitmap, tile: bool) =
     privateAccess(PlaydateGraphics)

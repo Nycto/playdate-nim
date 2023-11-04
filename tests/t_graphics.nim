@@ -86,6 +86,16 @@ proc execGraphicsTests*(runnable: bool) =
                 img.set(0, 1, kColorClear)
                 check($img == "░█\n ░\n")
 
+        test "Bulk setting pixels on an image":
+            if runnable:
+                var img = playdate.graphics.newBitmap(4, 2, kColorWhite)
+                discard img.setBitmapMask()
+                img.setMany([
+                    [ kColorWhite, kColorBlack, kColorClear, kColorXOR,   kColorWhite, kColorBlack, kColorClear, kColorXOR   ],
+                    [ kColorBlack, kColorClear, kColorXOR,   kColorWhite, kColorBlack, kColorClear, kColorXOR,   kColorWhite ],
+                ])
+                check($img == "░█ █\n█ █░\n")
+
 when isMainModule:
     # We can't run these methods from the tests, so we're only interested in
     # whether they compile.
