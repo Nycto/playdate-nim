@@ -1,0 +1,57 @@
+name: Common build setup
+runs:
+  using: "composite"
+  steps:
+
+    - run: apt update && apt install sudo apt-utils
+      shell: bash
+
+    - run: git config --global --add safe.directory "$(pwd)"
+      shell: bash
+
+    - name: Determine Playdate SDK version
+      shell: bash
+      id: playdate-sdk-version
+      run: echo "version=$(curl -s --head https://download.panic.com/playdate_sdk/linux/playdatesdk-latest.tar.gz | grep 'location:' | cut -d" " -f2)" >> "$GITHUB_OUTPUT"
+
+    # Setup a workflow cache for the downloaded version of the playdate SDK
+    - id: cache-playdate-sdk
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/PlaydateSDK
+        key: playdate-sdk-${{ steps.playdate-sdk-version.outputs.version }}
+
+    # If the PlaydateSDK isn't in cache, download it
+    - name: Download Playdate SDK
+      shell: bash
+      if: steps.cache-playdate-sdk.outputs.cache-hit != 'true'
+      run: wget -qO- https://download.panic.com/playdate_sdk/linux/playdatesdk-latest.tar.gz | tar xz "--one-top-level=$HOME/.cache/PlaydateSDK"
+
+    - name: Set PLAYDATE_SDK_PATH
+      shell: bash
+      run: echo "PLAYDATE_SDK_PATH=$(readlink -f $(find ~/.cache/PlaydateSDK/PlaydateSDK-* -maxdepth 0 -type d))" >> "$GITHUB_ENV"
+
+    - name: Install Nim
+      uses: jiro4989/setup-nim-action@v1
+      with:
+        nim-version: '1.6.16'
+
+    # Some of the apt dependencies require input from the installer. This disables those
+    # prompts so we can do a headless install
+    - name: Force non-interactive apt installations
+      shell: bash
+      run: echo 'debconf debconf/frontend select Noninteractive' | debconf-set-selections
+
+    - name: Install apt dependencies
+      shell: bash
+      run: apt-get install -y libpng16-16 gcc-arm-none-eabi
+
+    - run: nimble --accept refresh
+      shell: bash
+
+    - run: nimble install
+      shell: bash
+
+    - name: Locally publish playdate nimble package
+      shell: bash
+      run: nimble develop
