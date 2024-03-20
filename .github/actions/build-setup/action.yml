@@ -1,4 +1,7 @@
 name: Common build setup
+inputs:
+  nim-version:
+    required: true
 runs:
   using: "composite"
   steps:
@@ -34,7 +37,7 @@ runs:
     - name: Install Nim
       uses: jiro4989/setup-nim-action@v1
       with:
-        nim-version: '1.6.16'
+        nim-version: ${{ inputs.nim-version }}
 
     # Some of the apt dependencies require input from the installer. This disables those
     # prompts so we can do a headless install
@@ -54,4 +57,5 @@ runs:
 
     - name: Locally publish playdate nimble package
       shell: bash
+      if: ${{ startsWith(inputs.nim-version, '1.') }}
       run: nimble develop
