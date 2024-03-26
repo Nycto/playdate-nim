@@ -1,0 +1,14 @@
+name: Execute headless tests
+runs:
+  using: "composite"
+  steps:
+
+    - run: nimble simulator
+      working-directory: ./tests
+      shell: bash
+
+    - run: |
+        export HOME="/config"
+        xvfb-run "${{ env.PLAYDATE_SDK_PATH }}/bin/PlaydateSimulator" tests.pdx;
+      working-directory: ./tests
+      shell: bash

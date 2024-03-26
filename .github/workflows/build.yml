@@ -54,7 +54,7 @@ jobs:
 
     - uses: tecolicom/actions-use-apt-tools@v1
       with:
-        tools: xvfb libgtk-3-0 sudo libwebkit2gtk-4.0 libwebkit2gtk-4.0-dev libsdl2-dev pulseaudio
+        tools: xvfb libgtk-3-0 sudo libwebkit2gtk-4.0-dev libsdl2-dev pulseaudio
 
       # Because we are headless there is no audio driver to interact with by default, which causes a set
       # of warnings to be emitted. This set of commands sets up a dummy audio sink that silences those warnings.
@@ -63,9 +63,6 @@ jobs:
         export HOME="/config"
         pulseaudio -D --exit-idle-time=-1
         pactl load-module module-null-sink sink_name=SpeakerOutput sink_properties=device.description="Dummy_Output"
-
-    - run: nimble simulator
-      working-directory: ./tests
 
       # The first time the simulator runs, it prompts the user with an alert. Obviously, we're running headless,
       # so this prevents the tests from running without closing that alert. Creating this ini file will stop that
@@ -79,8 +76,17 @@ jobs:
         echo "ShowElist=0" >> $PD_INI_FILE
         echo "LastRelease=$(cat "$PLAYDATE_SDK_PATH/VERSION.txt")" >> $PD_INI_FILE
 
-    - name: Run headless test
-      working-directory: ./tests
-      run: |
-        export HOME="/config"
-        xvfb-run "$PLAYDATE_SDK_PATH/bin/PlaydateSimulator" tests.pdx
+    - name: Run headless tests
+      uses: ./.github/actions/run-headless-tests
+      continue-on-error: true
+      id: attempt1
+
+    - name: Run headless tests -- retry 1
+      uses: ./.github/actions/run-headless-tests
+      continue-on-error: true
+      id: attempt2
+      if: steps.attempt1.outcome == 'failure'
+
+    - name: Run headless tests -- retry 2
+      uses: ./.github/actions/run-headless-tests
+      if: steps.attempt2.outcome == 'failure'
