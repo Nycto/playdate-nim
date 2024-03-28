@@ -73,9 +73,8 @@ type LCDBitmapTablePtr {.importc: "LCDBitmapTable*", header: "pd_api.h".} = poin
 type LCDFontPtr {.importc: "LCDFont*", header: "pd_api.h".} = pointer
 type LCDFontObj = object
     resource: LCDFontPtr
-
-proc `=destroy`(this: var LCDFontObj) = deallocImpl(this.resource)
-
+proc `=destroy`(this: var LCDFontObj) =
+    discard utils.realloc(this.resource, 0)
 type LCDFont* = ref LCDFontObj
 
 type LCDFontDataPtr {.importc: "LCDFontData*", header: "pd_api.h".} = object
@@ -84,17 +83,15 @@ type LCDFontData* = LCDFontDataPtr
 type LCDFontPagePtr {.importc: "LCDFontPage*", header: "pd_api.h".} = pointer
 type LCDFontPageObj = object
     resource: LCDFontPagePtr
-
-proc `=destroy`(this: var LCDFontPageObj) = deallocImpl(this.resource)
-
+proc `=destroy`(this: var LCDFontPageObj) =
+    discard utils.realloc(this.resource, 0)
 type LCDFontPage* = ref LCDFontPageObj
 
 type LCDFontGlyphPtr {.importc: "LCDFontGlyph*", header: "pd_api.h".} = pointer
 type LCDFontGlyphObj = object
     resource: LCDFontGlyphPtr
-
-proc `=destroy`(this: var LCDFontGlyphObj) = deallocImpl(this.resource)
-
+proc `=destroy`(this: var LCDFontGlyphObj) =
+    discard utils.realloc(this.resource, 0)
 type LCDFontGlyph* = ref LCDFontGlyphObj
 
 type LCDVideoPlayerRaw {.importc: "LCDVideoPlayer", header: "pd_api.h".} = object

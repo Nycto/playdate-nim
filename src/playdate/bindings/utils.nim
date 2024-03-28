@@ -1,5 +1,7 @@
 import macros
 
+var realloc*: proc(p: pointer, size: csize_t): pointer {.cdecl.}
+
 func toNimSymbol(typeSymbol: string): string =
     case typeSymbol:
         of "cint":
