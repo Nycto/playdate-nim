@@ -35,7 +35,8 @@ proc `=destroy`(this: var LCDSpriteObj) =
     `=destroy`(this.bitmap)
     `=destroy`(this.stencil)
 
-var spritesData = initDoublyLinkedList[LCDSprite]()
+when not defined(disableSpritesData):
+    var spritesData = initDoublyLinkedList[LCDSprite]()
 
 proc setAlwaysRedraw*(this: ptr PlaydateSprite, flag: bool) =
     privateAccess(PlaydateSprite)
@@ -62,27 +63,36 @@ proc copy*(this: LCDSprite): LCDSprite =
 
 proc add*(this: LCDSprite) =
     privateAccess(PlaydateSprite)
-    if playdate.sprite.getUserdata(this.resource) != nil:
-        return
+
+    when not defined(disableSpritesData):
+        if playdate.sprite.getUserdata(this.resource) != nil:
+            return
+
     playdate.sprite.addSprite(this.resource)
-    let dataNode = newDoublyLinkedNode[LCDSprite](this)
-    spritesData.add(dataNode)
-    # let tailAddr = addr(spritesData.tail)
-    # playdate.system.logToConsole(fmt"tail addr is {tailAddr.repr}")
-    playdate.sprite.setUserdata(this.resource, addr(dataNode[]))
+
+    when not defined(disableSpritesData):
+        let dataNode = newDoublyLinkedNode[LCDSprite](this)
+        spritesData.add(dataNode)
+        # let tailAddr = addr(spritesData.tail)
+        # playdate.system.logToConsole(fmt"tail addr is {tailAddr.repr}")
+        playdate.sprite.setUserdata(this.resource, addr(dataNode[]))
 
 proc remove*(this: LCDSprite) =
     privateAccess(PlaydateSprite)
-    let dataNode = cast[ptr DoublyLinkedNodeObj[LCDSprite]](playdate.sprite.getUserdata(this.resource))
-    if dataNode == nil:
-        return
+    when not defined(disableSpritesData):
+        let dataNode = cast[ptr DoublyLinkedNodeObj[LCDSprite]](playdate.sprite.getUserdata(this.resource))
+        if dataNode == nil:
+            return
+
     playdate.sprite.removeSprite(this.resource)
-    if dataNode.prev != nil:
-        spritesData.remove(dataNode.prev.next)
-    else:
-        spritesData.remove(spritesData.head)
-    # spritesData.remove(dataNode[])
-    playdate.sprite.setUserdata(this.resource, nil)
+
+    when not defined(disableSpritesData):
+        if dataNode.prev != nil:
+            spritesData.remove(dataNode.prev.next)
+        else:
+            spritesData.remove(spritesData.head)
+        # spritesData.remove(dataNode[])
+        playdate.sprite.setUserdata(this.resource, nil)
 
 proc removeSprites*(this: ptr PlaydateSprite, sprites: openarray[LCDSprite]) =
     privateAccess(PlaydateSprite)
@@ -98,23 +108,25 @@ proc removeSprites*(this: ptr PlaydateSprite, sprites: openarray[LCDSprite]) =
     if count > 0:
         this.removeSprites(addr spritePointers[0], count.cint)
 
-    for i, s in sprites:
-        let dataNode = cast[ptr DoublyLinkedNodeObj[LCDSprite]](this.getUserdata(s.resource))
-        if dataNode == nil:
-            return
-        if dataNode.prev != nil:
-            spritesData.remove(dataNode.prev.next)
-        else:
-            spritesData.remove(spritesData.head)
-        # spritesData.remove(dataNode[])
-        this.setUserdata(s.resource, nil)
+    when not defined(disableSpritesData):
+        for i, s in sprites:
+            let dataNode = cast[ptr DoublyLinkedNodeObj[LCDSprite]](this.getUserdata(s.resource))
+            if dataNode == nil:
+                return
+            if dataNode.prev != nil:
+                spritesData.remove(dataNode.prev.next)
+            else:
+                spritesData.remove(spritesData.head)
+            # spritesData.remove(dataNode[])
+            this.setUserdata(s.resource, nil)
 
-proc removeAllSprites*(this: ptr PlaydateSprite) =
-    privateAccess(PlaydateSprite)
-    this.removeAllSprites()
-    for s in spritesData.mitems:
-        this.setUserdata(s.resource, nil)
-    spritesData = initDoublyLinkedList[LCDSprite]()
+when not defined(disableSpritesData):
+    proc removeAllSprites*(this: ptr PlaydateSprite) =
+        privateAccess(PlaydateSprite)
+        this.removeAllSprites()
+        for s in spritesData.mitems:
+            this.setUserdata(s.resource, nil)
+        spritesData = initDoublyLinkedList[LCDSprite]()
 
 proc `bounds=`*(this: LCDSprite, bounds: PDRect) =
     privateAccess(PlaydateSprite)
@@ -274,22 +286,23 @@ proc setCollisionResponseFunction*(this: LCDSprite, filter: LCDSpriteCollisionFi
     this.collisionFunction = filter
     playdate.sprite.setCollisionResponseFunction(this.resource, if filter != nil: privateCollisionResponse else: nil)
 
+when not defined(disableSpritesData):
+    proc sprite*(this: SpriteCollisionInfo): LCDSprite =
+        privateAccess(PlaydateSprite)
+        privateAccess(SpriteCollisionInfoPtr)
+        let dataNode = cast[ptr DoublyLinkedNodeObj[LCDSprite]](playdate.sprite.getUserdata(this.spritePtr))
+        if dataNode == nil:
+            return nil
+        return dataNode.value
 
-proc sprite*(this: SpriteCollisionInfo): LCDSprite =
-    privateAccess(PlaydateSprite)
-    privateAccess(SpriteCollisionInfoPtr)
-    let dataNode = cast[ptr DoublyLinkedNodeObj[LCDSprite]](playdate.sprite.getUserdata(this.spritePtr))
-    if dataNode == nil:
-        return nil
-    return dataNode.value
-
-proc other*(this: SpriteCollisionInfo): LCDSprite =
-    privateAccess(PlaydateSprite)
-    privateAccess(SpriteCollisionInfoPtr)
-    let dataNode = cast[ptr DoublyLinkedNodeObj[LCDSprite]](playdate.sprite.getUserdata(this.otherPtr))
-    if dataNode == nil:
-        return nil
-    return dataNode.value
+when not defined(disableSpritesData):
+    proc other*(this: SpriteCollisionInfo): LCDSprite =
+        privateAccess(PlaydateSprite)
+        privateAccess(SpriteCollisionInfoPtr)
+        let dataNode = cast[ptr DoublyLinkedNodeObj[LCDSprite]](playdate.sprite.getUserdata(this.otherPtr))
+        if dataNode == nil:
+            return nil
+        return dataNode.value
 
 # template responseType*(this: SpriteCollisionInfoObj): SpriteCollisionResponseType = this.resource.responseType
 # template overlaps*(this: SpriteCollisionInfoObj): uint8 = this.resource.overlaps
