@@ -47,21 +47,22 @@ proc setupRealloc*(allocator: PDRealloc) =
 
 proc allocImpl(size: Natural): pointer =
     # Integrage with: https://nim-lang.org/docs/estp.html
-    when defined(memProfiler):
-        {.cast(tags: []).}:
+    {.cast(tags: []).}:
+        when defined(memProfiler):
             try:
                 nimProfile(size.int)
             except:
                 discard
 
-    return trace.alloc(pdrealloc, size.csize_t)
+        return trace.alloc(pdrealloc, size.csize_t)
 
 proc alloc0Impl(size: Natural): pointer =
     result = allocImpl(size)
     zeroMem(result, size)
 
 proc reallocImpl(p: pointer, newSize: Natural): pointer =
-    return trace.realloc(pdrealloc, p, newSize)
+    {.cast(tags: []).}:
+        return trace.realloc(pdrealloc, p, newSize)
 
 proc realloc0Impl(p: pointer, oldsize, newSize: Natural): pointer =
     result = reallocImpl(p, newSize.csize_t)
@@ -69,7 +70,8 @@ proc realloc0Impl(p: pointer, oldsize, newSize: Natural): pointer =
         zeroMem(cast[pointer](cast[uint](result) + uint(oldSize)), newSize - oldSize)
 
 proc deallocImpl(p: pointer) =
-    trace.dealloc(pdrealloc, p)
+    {.cast(tags: []).}:
+        trace.dealloc(pdrealloc, p)
 
 # The shared allocators map on the regular ones
 

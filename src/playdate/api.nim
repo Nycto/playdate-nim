@@ -3,7 +3,7 @@
 import macros
 import std/importutils
 
-import bindings/api
+import bindings/[api, memtrace]
 export api
 
 import graphics, system, file, sprite, display, sound, lua, json, utils, types, nineslice
@@ -15,9 +15,16 @@ macro initSDK*() =
 
         proc eventHandler(playdateAPI: ptr PlaydateAPI, event: PDSystemEvent, arg: uint32): cint {.cdecl, exportc.} =
             privateAccess(PlaydateSys)
+            privateAccess(PlaydateFile)
             if event == kEventInit:
                 when declared(setupRealloc):
                     setupRealloc(playdateAPI.system.realloc)
+                injectMemTaceProcs(
+                    playdateApi.file.open,
+                    playdateApi.file.close,
+                    playdateApi.file.write,
+                    playdateApi.system.logToConsole
+                )
                 NimMain()
                 api.playdate = playdateAPI
             handler(event, arg)

@@ -1,10 +1,18 @@
-import system/ansi_c, sparsemap
+import system/ansi_c, sparsemap, fileDefs
 
 proc mprotect(a1: pointer, a2: int, a3: cint): cint {.importc, header: "<sys/mman.h>".}
 
-proc fopen(filename, mode: cstring): CFilePtr {.importc: "fopen", nodecl.}
+var pdfopen: proc (name: cstring; mode: FileOptions): SDFilePtr {.cdecl, raises: [].}
+var pdfclose: proc (file: SDFilePtr): cint {.cdecl, raises: [].}
+var pdfwrite: proc (file: SDFilePtr; buf: pointer; len: cuint): cint {.cdecl, raises: [].}
+var pdLog: proc (fmt: cstring) {.cdecl, varargs, raises: [].}
 
-proc fclose(file: CFilePtr) {.importc: "fclose", nodecl.}
+proc injectMemTaceProcs*(open, close, write, log: auto) =
+    ## Sets pointers to functions that allow tracing to happen on device
+    pdfopen = open
+    pdfclose = close
+    pdfwrite = write
+    pdLog = log
 
 const SLOTS = 20_000
 
@@ -93,33 +101,32 @@ proc printStack[N: static int](frames: array[N, StackFrame]) =
         )
 
 proc printMem(p: pointer, size: Natural) =
-    let data = cast[ptr UncheckedArray[byte]](p)
-    for i in 0..<size:
-        if i == BUFFER or i == size - BUFFER:
-            cfprintf(cstderr, "\n ")
+    when not defined(device):
+        let data = cast[ptr UncheckedArray[byte]](p)
+        for i in 0..<size:
+            if i == BUFFER or i == size - BUFFER:
+                cfprintf(cstderr, "\n ")
 
-        let byt = data[i]
-        if byt.int in 41..126:
-            cfprintf(cstderr, " %c", byt)
-        else:
-            cfprintf(cstderr, " %X", byt.int)
+            let byt = data[i]
+            if byt.int in 41..126:
+                cfprintf(cstderr, " %c", byt)
+            else:
+                cfprintf(cstderr, " %X", byt.int)
 
-    cfprintf(cstderr, "\n")
+        cfprintf(cstderr, "\n")
 
 proc yesNo(flag: bool): char =
     return if flag: 'y' else: 'n'
 
 proc print(alloc: Allocation, title: cstring, printMem: bool = false) =
-    cfprintf(
-        cstderr,
+    pdLog(
         "%s (resized: %c, original size: %i, fenced: %c)\n",
         title,
         alloc.resized.yesNo,
         alloc.originalSize,
         alloc.protected.yesNo,
     )
-    cfprintf(
-        cstderr,
+    pdLog(
         "  %p (Overall size: %i, internal size: %i)\n",
         alloc.realPointer,
         alloc.realSize,
@@ -206,28 +213,48 @@ proc zeroBuffers(p: pointer, size: Natural) =
         cfprintf(cstderr, "Zeroing failed! ")
         p.printMem(size.realSize)
 
+template appendf(file: SDFilePtr, format: cstring, values: varargs[typed]) =
+    var buffer: array[400, char]
+    let length = c_sprintf(addr buffer, format, values)
+    discard pdfwrite(file, addr buffer, length.cuint)
+
+template append(file: SDFilePtr, value: char) =
+    var buffer: array[1, char]
+    buffer[0] = value
+    discard pdfwrite(file, addr buffer, 1)
+
+template append(file: SDFilePtr, str: StackString) =
+    discard pdfwrite(file, addr str.data, str.len.cuint)
+
+let allocStr = "alloc".toStackStr(10)
+let deallocStr = "dealloc".toStackStr(10)
+let reallocStr = "realloc".toStackStr(10)
+
 proc record[N: static int](
-    action: cstring,
+    action: StackString[10],
     input: pointer,
     output: pointer,
     size: Natural,
     stack: array[N, StackFrame] = createStackFrame[N](getFrame())
 ) {.inline.} =
     when defined(memrecord):
-        let handle = fopen("memrecord.txt", "a")
-        defer: fclose(handle)
+        let handle = pdfopen("memrecord.txt", kFileAppend)
+        defer: discard pdfclose(handle)
 
-        cfprintf(handle, "%s,%p,%p,%i,", action, input, output, size)
+        handle.append(action)
+        handle.appendf(",%p,%p,%i,", input, output, size)
 
         for i in 0..<N:
             if not stack[i].used:
                 break
             if i > 0:
-                c_fputc('|', handle)
-            discard c_fwrite(addr stack[i].filename, 1, stack[i].filename.len.csize_t, handle)
-            c_fputc(':', handle)
-            discard c_fwrite(addr stack[i].procname, 1, stack[i].procname.len.csize_t, handle)
-        c_fputc('\n', handle)
+                handle.append('|')
+            handle.append(stack[i].filename)
+            handle.append(':')
+            handle.append(stack[i].procname)
+            handle.append(':')
+            handle.appendf("%i", stack[i].line.cint)
+        handle.append('\n')
 
 proc traceAlloc(trace: var MemTrace, alloc: Allocator, size: Natural): pointer {.inline.} =
     trace.totalAllocs += 1
@@ -255,7 +282,7 @@ proc alloc*(trace: var MemTrace, alloc: Allocator, size: Natural): pointer {.inl
         result = traceAlloc(trace, alloc, size)
     else:
         result = alloc(nil, size.csize_t)
-    record[5]("alloc", result, result, size)
+    record[5](allocStr, result, result, size)
 
 proc traceRealloc(trace: var MemTrace, alloc: Allocator, p: pointer, newSize: Natural): pointer {.inline.} =
     trace.check
@@ -290,7 +317,7 @@ proc realloc*(trace: var MemTrace, alloc: Allocator, p: pointer, newSize: Natura
         result = traceRealloc(trace, alloc, p, newSize)
     else:
         result = alloc(p, newSize.csize_t)
-    record[5]("realloc", p, result, newSize)
+    record[5](reallocStr, p, result, newSize)
 
 proc traceDealloc(trace: var MemTrace, alloc: Allocator, p: pointer) {.inline.} =
     trace.check
@@ -315,5 +342,5 @@ proc traceDealloc(trace: var MemTrace, alloc: Allocator, p: pointer) {.inline.} 
         trace.allocs.delete(realPointer.ord)
 
 proc dealloc*(trace: var MemTrace, alloc: Allocator, p: pointer) {.inline.} =
-    record[5]("dealloc", p, p, 0)
+    record[5](deallocStr, p, p, 0)
     when defined(memtrace): traceDealloc(trace, alloc, p) else: discard alloc(p, 0)
