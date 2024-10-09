@@ -1,4 +1,4 @@
-import system/ansi_c, sparsemap, fileDefs
+import system/ansi_c, sparsemap, fileDefs, ../util/stackstring
 
 proc mprotect(a1: pointer, a2: int, a3: cint): cint {.importc, header: "<sys/mman.h>".}
 
@@ -23,10 +23,6 @@ const BUFFER = sizeof(byte) * 8
 type
     Allocator* = proc (p: pointer; size: csize_t): pointer {.tags: [], raises: [], cdecl, gcsafe.}
 
-    StackString[N : static int] = object
-        data: array[N, char]
-        len: int32
-
     StackFrame = object
         used: bool
         procname: StackString[50]
@@ -46,16 +42,6 @@ type
         allocs: StaticSparseMap[SLOTS, uint64, Allocation]
         deleted: StaticSparseMap[SLOTS, uint64, Allocation]
         totalAllocs: int
-
-proc toStackStr(input: cstring, N: static int): StackString[N] =
-    var i = 0'i32
-    for c in input:
-        if i >= N - 1:
-            break
-        result.data[i] = c
-        i += 1
-    result.data[i] = '\0'
-    result.len = i
 
 proc endsWith(a, b: cstring): bool =
     let aLen = a.len
@@ -80,8 +66,8 @@ proc createStackFrame[N: static int](frame: PFrame): array[N, StackFrame] =
         if not current.filename.endsWith("/arc.nim"):
             result[i] = StackFrame(
                 used: true,
-                procname: current.procname.toStackStr(50),
-                filename: current.filename.toStackStr(200),
+                procname: current.procname.stackstring(50),
+                filename: current.filename.stackstring(200),
                 line: current.line.int32
             )
             i += 1
@@ -224,11 +210,11 @@ template append(file: SDFilePtr, value: char) =
     discard pdfwrite(file, addr buffer, 1)
 
 template append(file: SDFilePtr, str: StackString) =
-    discard pdfwrite(file, addr str.data, str.len.cuint)
+    discard pdfwrite(file, cstr(str), str.len.cuint)
 
-let allocStr = "alloc".toStackStr(10)
-let deallocStr = "dealloc".toStackStr(10)
-let reallocStr = "realloc".toStackStr(10)
+let allocStr = "alloc".stackstring(10)
+let deallocStr = "dealloc".stackstring(10)
+let reallocStr = "realloc".stackstring(10)
 
 proc record[N: static int](
     action: StackString[10],
