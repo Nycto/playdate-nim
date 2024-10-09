@@ -199,48 +199,48 @@ proc zeroBuffers(p: pointer, size: Natural) =
         cfprintf(cstderr, "Zeroing failed! ")
         p.printMem(size.realSize)
 
-template appendf(file: SDFilePtr, format: cstring, values: varargs[typed]) =
-    var buffer: array[400, char]
-    let length = c_sprintf(addr buffer, format, values)
-    discard pdfwrite(file, addr buffer, length.cuint)
-
-template append(file: SDFilePtr, value: char) =
-    var buffer: array[1, char]
-    buffer[0] = value
-    discard pdfwrite(file, addr buffer, 1)
-
-template append(file: SDFilePtr, str: StackString) =
-    discard pdfwrite(file, cstr(str), str.len.cuint)
-
 let allocStr = "alloc".stackstring(10)
 let deallocStr = "dealloc".stackstring(10)
 let reallocStr = "realloc".stackstring(10)
+
+var recordFile: SDFilePtr
 
 proc record[N: static int](
     action: StackString[10],
     input: pointer,
     output: pointer,
     size: Natural,
-    stack: array[N, StackFrame] = createStackFrame[N](getFrame())
+    stackFrame: PFrame = getFrame()
 ) {.inline.} =
     when defined(memrecord):
-        let handle = pdfopen("memrecord.txt", kFileAppend)
-        defer: discard pdfclose(handle)
+        if recordFile == nil:
+            recordFile = pdfopen("memrecord.txt", kFileAppend)
 
-        handle.append(action)
-        handle.appendf(",%p,%p,%i,", input, output, size)
+        var buffer: StackString[1000]
+        buffer &= action
+        buffer &= ','
+        buffer &= input
+        buffer &= ','
+        buffer &= output
+        buffer &= ','
+        buffer &= size.int32
+        buffer &= ','
 
+        let stack = createStackFrame[N](stackFrame)
         for i in 0..<N:
             if not stack[i].used:
                 break
             if i > 0:
-                handle.append('|')
-            handle.append(stack[i].filename)
-            handle.append(':')
-            handle.append(stack[i].procname)
-            handle.append(':')
-            handle.appendf("%i", stack[i].line.cint)
-        handle.append('\n')
+                buffer &= '|'
+            buffer &= stack[i].filename
+            buffer &= ':'
+            buffer &= stack[i].procname
+            buffer &= ':'
+            buffer &= stack[i].line
+
+        buffer.suffix('\n')
+
+        discard pdfwrite(recordFile, buffer.cstr, buffer.len.cuint)
 
 proc traceAlloc(trace: var MemTrace, alloc: Allocator, size: Natural): pointer {.inline.} =
     trace.totalAllocs += 1
