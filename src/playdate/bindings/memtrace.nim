@@ -78,9 +78,8 @@ proc printStack[N: static int](frames: array[N, StackFrame]) =
     for i in 0..<N:
         if not frames[i].used:
             return
-        cfprintf(
-            cstderr,
-            "    %s:%i %s\n",
+        pdLog(
+            "    %s:%i %s",
             addr frames[i].filename,
             frames[i].line,
             addr frames[i].procname
@@ -106,14 +105,14 @@ proc yesNo(flag: bool): char =
 
 proc print(alloc: Allocation, title: cstring, printMem: bool = false) =
     pdLog(
-        "%s (resized: %c, original size: %i, fenced: %c)\n",
+        "%s (resized: %c, original size: %i, fenced: %c)",
         title,
         alloc.resized.yesNo,
         alloc.originalSize,
         alloc.protected.yesNo,
     )
     pdLog(
-        "  %p (Overall size: %i, internal size: %i)\n",
+        "  %p (Overall size: %i, internal size: %i)",
         alloc.realPointer,
         alloc.realSize,
         alloc.realSize - 2 * BUFFER
@@ -154,11 +153,11 @@ proc printPrior(trace: var MemTrace, p: pointer) =
 
     if distance != high(uint64):
         found.print("Preceding allocation")
-        cfprintf(cstderr, "  Distance: %i\n", distance)
+        pdLog("  Distance: %i", distance)
 
 proc check(trace: var MemTrace) =
     if trace.totalAllocs mod 100 == 0:
-        cfprintf(cstderr, "Allocations count: %i (active: %i)\n", trace.totalAllocs, trace.allocs.size)
+        pdLog("Allocations count: %i (active: %i)", trace.totalAllocs, trace.allocs.size)
 
     for (_, alloc) in trace.allocs:
         if not alloc.protected and not alloc.reported and isInvalid(alloc.realPointer, alloc.realSize):
@@ -174,7 +173,7 @@ proc checkOverlaps(trace: var MemTrace, title: cstring, newAlloc: Allocation) =
     for (_, alloc) in trace.allocs:
         let existingRange = alloc.memRange
         if existingRange.a in newRange or existingRange.b in newRange:
-            cfprintf(cstderr, "%s overlaps with existing allocation!\n", title)
+            pdLog("%s overlaps with existing allocation!", title)
             newAlloc.print(title)
             alloc.print("Overlaps with:")
 
@@ -196,7 +195,7 @@ proc zeroBuffers(p: pointer, size: Natural) =
     zeroMem(p, BUFFER)
     zeroMem(p + size + BUFFER, BUFFER)
     if p.isInvalid(size.realSize):
-        cfprintf(cstderr, "Zeroing failed! ")
+        pdLog("Zeroing failed! ")
         p.printMem(size.realSize)
 
 let allocStr = "alloc".stackstring(10)
@@ -310,7 +309,7 @@ proc traceDealloc(trace: var MemTrace, alloc: Allocator, p: pointer) {.inline.} 
     let realPointer = p.input
     let entry = trace.allocs[realPointer.ord]
     if entry == nil:
-        cfprintf(cstderr, "Attempting to dealloc unmanaged memory! %p\n", p)
+        pdLog("Attempting to dealloc unmanaged memory! %p", p)
         createStackFrame[STACK_SIZE](getFrame()).printStack()
         let deleted = trace.deleted[realPointer.ord]
         if deleted == nil:
