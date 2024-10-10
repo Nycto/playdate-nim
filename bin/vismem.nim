@@ -2,7 +2,7 @@
 ## Creates a visualization image of memory allocations
 ##
 
-import std/[os, strutils, parseutils, strformat, tables]
+import std/[os, strutils, parseutils, strformat, tables, algorithm]
 
 doAssert(paramCount() == 1)
 
@@ -10,113 +10,124 @@ type
     EventKind = enum alloc, dealloc, realloc
 
     Event = object
+        actionIndex: int
         kind: EventKind
-        input, output, size: int64
+        input, output, size, yCoord: int64
         stack: string
-
-proc copy(
-    event: Event,
-    kind: EventKind = event.kind,
-    input: int64 = event.input,
-    output: int64 = event.output,
-    size: int64 = event.size,
-): Event =
-    result.kind = kind
-    result.input = input
-    result.output = output
-    result.size = size
-    result.stack = event.stack
 
 var events: seq[Event]
 
-proc parse(line: string): Event =
+proc parse(i: int, line: string): Event =
     let parts = line.split(',', 5)
     doAssert(parts.len == 5)
     result.kind = parseEnum[EventKind](parts[0])
     doAssert(parseHex(parts[1], result.input) > 0)
     doAssert(parseHex(parts[2], result.output) > 0)
+    result.yCoord = result.input
     result.size = parseInt(parts[3])
     result.stack = parts[4]
+    result.actionIndex = i
 
-for line in lines(paramStr(1)):
-    events.add(parse(line))
+block:
+    var i = 0
+    for line in lines(paramStr(1)):
+        events.add(parse(i, line))
+        i += 1
 
-proc memoryBounds(): tuple[minPointer, maxPointer, entries, minSize: int64] =
+block:
+    var adjustment = 0
+    var maxOffset = 0
+    for event in events.sortedByIt(it.output):
+        let newY = min(maxOffset + 500, event.output - adjustment)
+        maxOffset = max(maxOffset, newY + event.size)
+        adjustment = event.output - newY
+        events[event.actionIndex].yCoord = newY
+
+proc memoryBounds(): tuple[minPointer, entries, minSize, maxYCoord: int64] =
     for event in events:
         let eventMin = min(event.input, event.output)
         result.minPointer = if result.minPointer == 0: eventMin else: min(eventMin, result.minPointer)
-        result.maxPointer = max(max(event.input, event.output) + event.size, result.maxPointer)
-        doAssert(result.minPointer < result.maxPointer)
 
         if event.size > 0:
             result.minSize = if result.minSize == 0: event.size else: min(result.minSize, event.size)
+
+        result.maxYCoord = max(event.yCoord + event.size, result.maxYCoord)
 
         case event.kind
         of alloc, dealloc: result.entries += 1
         of realloc: result.entries += 2
 
+let (minPointer, entries, minSize, maxYCoord) = memoryBounds()
+
 const ROW_WIDTH = 2
+const LEGEND_HEIGHT = 28
+const LEGEND_MARGIN = 5
+const LEGEND_TEXT_Y = 20
 
-let (minPointer, maxPointer, entries, minSize) = memoryBounds()
+let width = max(entries * ROW_WIDTH, 800)
 
-let overallheight = (maxPointer - minPointer) div minSize
-echo fmt"""<svg height="{overallheight}" width="{entries * ROW_WIDTH}" xmlns="http://www.w3.org/2000/svg">"""
-echo """
+let overallheight = maxYCoord div minSize + LEGEND_HEIGHT + LEGEND_MARGIN + 50
+
+proc legendSwatch(x: int, class, title, hover: string): string =
+    return fmt"""
+        <rect class="{class}" height="{LEGEND_TEXT_Y}" width="{LEGEND_TEXT_Y}" y="4" x="{x}">
+            <title>{hover}</title>
+        </rect>
+        <text x="{x + LEGEND_TEXT_Y + 10}" y="{LEGEND_TEXT_Y}" class="subtext">{title}</text>
+    """
+
+echo fmt"""<svg height="{overallheight}" width="{width}" xmlns="http://www.w3.org/2000/svg">"""
+echo fmt"""
   <style>
-    .alloc {
-      fill: skyblue;
-      stroke-width: 1px;
-    }
-    .alloc-no-dealloc {
-      fill: blue;
-    }
-    .unmanaged-dealloc {
-      fill: red;
-    }
+    .alloc {{ fill: skyblue; }}
+    .alloc-no-dealloc {{ fill: blue; }}
+    .unmanaged-dealloc {{ fill: red; }}
+    .alloc, .unmanaged-dealloc, .alloc-no-dealloc {{ opacity: 60%; }}
+    .alloc:hover, .unmanaged-dealloc:hover, .alloc-no-dealloc:hover {{ opacity: 90%; }}
 
-    .alloc, .unmanaged-dealloc, .alloc-no-dealloc {
-      opacity: 60%;
-    }
-
-    .alloc:hover, .unmanaged-dealloc:hover, .alloc-no-dealloc:hover {
-        opacity: 90%;
-    }
+    .title {{ font-size: 18px; }}
+    .subtext {{ font-size: 16px; }}
   </style>
-"""
+  <rect x="0" y="0" width="100%" height="{LEGEND_HEIGHT}" stroke="black" fill="white" />
+  <text x="5" y="{LEGEND_TEXT_Y}" class="title">Legend</text>
 
-proc y(pointerVal: SomeInteger): auto = (pointerVal - minPointer) div minSize
+  <text x="100" y="{LEGEND_TEXT_Y}" class="subtext">↕ Memory Address</text>
+  <text x="300" y="{LEGEND_TEXT_Y}" class="subtext">↔ Time</text>
+  {legendSwatch(400, "alloc", "Memory Allocation", "A typical memory allocation with a correctly matched free")}
+  {legendSwatch(630, "alloc-no-dealloc", "Unfreed Memory", "Memory that is allocated, but never freed")}
+  {legendSwatch(840, "unmanaged-dealloc", "Unmanaged free", "An attempt to free memory that has no matching allocation. For example, a double free")}
+"""
 
 proc x(entryId: SomeInteger): auto = entryId * ROW_WIDTH
 
 proc pointerName(pointerVal: int64): string =
     let hex = toHex(pointerVal)
-    return fmt"{pointerVal - minPointer} (0x{hex})"
+    return fmt"0x{hex} (rel addr: {pointerVal - minPointer})"
 
-proc rectangle(startPtr, size, startEntry, endEntry: int64; id, class, label, stack: string): string =
+proc rectangle(yCoord, size, startEntry, endEntry: int64; id, class, label: string): string =
     let width = endEntry.x - startEntry.x
     let height = size div minSize
+    let y = yCoord div minSize + LEGEND_HEIGHT + LEGEND_MARGIN
     return [
         fmt"""<a href="#{id}">""",
-        fmt""" <rect id="{id}" height="{height}" width="{width}" y="{startPtr.y}" x="{startEntry.x}" class="{class}">""",
-        fmt"""  <title>""",
-        fmt"""{label}""",
-        fmt"""Addr: {startPtr.pointerName}""",
-        fmt"""Size: {size}""",
-        fmt"""Action Indexes: {startEntry}-{endEntry}""",
-        fmt"""{stack.split('|').join("\n")}""",
-        fmt"""  </title>""",
+        fmt""" <rect id="{id}" height="{height}" width="{width}" y="{y}" x="{startEntry.x}" class="{class}">""",
+        fmt"""  <title>{label}</title>""",
         fmt""" </rect>""",
         fmt"""</a>""",
     ].join("\n")
 
 proc label(event: Event): string =
     case event.kind
-    of alloc: return fmt"Allocation of {event.output.pointerName}"
-    of dealloc: return fmt"Deallocation of {event.input.pointerName}"
-    of realloc: return fmt"Realloc from {event.input.pointerName} to {event.output.pointerName}"
+    of alloc: result = &"Allocation of {event.output.pointerName}\n"
+    of dealloc: result = &"Deallocation of {event.input.pointerName}\n"
+    of realloc: result = &"Realloc from {event.input.pointerName} to {event.output.pointerName}\n"
+
+    result &= &"Size: {event.size}\n\n"
+    result &= event.stack.split('|').join("\n")
+    # fmt"""Action Indexes: {startEntry}-{endEntry}""",
 
 proc rectangle(event: Event; startEntry, endEntry: int64; class: string): string =
-    return rectangle(event.output, event.size, startEntry, endEntry, $startEntry, class, event.label, event.stack)
+    return rectangle(event.yCoord, event.size, startEntry, endEntry, $startEntry, class, event.label)
 
 var openAllocs = initTable[int64, (int, Event)](events.len)
 
@@ -127,14 +138,13 @@ proc renderDealloc(entryId: int, dealloced: Event) =
         openAllocs.del(dealloced.input)
     else:
         echo rectangle(
-            dealloced.input,
+            dealloced.yCoord,
             minSize * 2,
             0,
             entryId,
             $entryId,
             "unmanaged-dealloc",
-            dealloced.label,
-            dealloced.stack
+            dealloced.label
         )
 
 proc renderAlloc(entryId: int, event: Event) =
@@ -144,21 +154,22 @@ proc renderAlloc(entryId: int, event: Event) =
         echo event.rectangle(ogEntryId, entryId, "alloc-no-dealloc")
     openAllocs[event.output] = (entryId, event)
 
-var i = 0
-for event in events:
-    case event.kind
-    of dealloc:
-        doAssert(event.input == event.output)
-        doAssert(event.size == 0)
-        renderDealloc(i, event)
-    of realloc:
-        renderDealloc(i, event)
+block:
+    var i = 0
+    for event in events:
+        case event.kind
+        of dealloc:
+            doAssert(event.input == event.output)
+            doAssert(event.size == 0)
+            renderDealloc(i, event)
+        of realloc:
+            renderDealloc(i, event)
+            i += 1
+            renderAlloc(i, event)
+        of alloc:
+            doAssert(event.input == event.output)
+            renderAlloc(i, event)
         i += 1
-        renderAlloc(i, event)
-    of alloc:
-        doAssert(event.input == event.output)
-        renderAlloc(i, event)
-    i += 1
 
 for _, (entryId, event) in openAllocs:
     echo event.rectangle(entryId, entries, "alloc-no-dealloc")
