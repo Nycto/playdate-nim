@@ -1,11 +1,9 @@
-import system/ansi_c, ../util/[stackstring, sparsemap], initreqs
+import ../util/[stackstring, sparsemap], initreqs
 
 when defined(device):
     proc mprotect(a1: pointer, a2: int, a3: cint): cint {.inline.} = discard
 else:
     proc mprotect(a1: pointer, a2: int, a3: cint): cint {.importc, header: "<sys/mman.h>".}
-
-proc fopen(filename, mode: cstring): CFilePtr {.importc: "fopen", nodecl.}
 
 const SLOTS = 20_000
 
@@ -180,7 +178,7 @@ let allocStr = "alloc".stackstring(10)
 let deallocStr = "dealloc".stackstring(10)
 let reallocStr = "realloc".stackstring(10)
 
-var recordFile: CFilePtr
+var recordFile: pointer
 
 proc record[N: static int](
     action: StackString[10],
@@ -191,7 +189,7 @@ proc record[N: static int](
 ) {.inline.} =
     when defined(memrecord):
         if recordFile == nil:
-            recordFile = fopen("memrecord.txt", "a")
+            recordFile = pdOpen("memrecord.txt", 2 shl 2)
 
         var buffer: StackString[1000]
         buffer &= action
@@ -217,7 +215,7 @@ proc record[N: static int](
 
         buffer.suffix('\n')
 
-        discard c_fwrite(buffer.cstr, buffer.len.cuint, 1, recordFile)
+        discard pdWrite(recordFile, buffer.cstr, buffer.len.cuint)
 
 proc traceAlloc(trace: var MemTrace, alloc: Allocator, size: Natural): pointer {.inline.} =
     trace.totalAllocs += 1
