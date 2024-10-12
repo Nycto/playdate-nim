@@ -1,4 +1,4 @@
-import unittest, playdate/util/stackstring
+import unittest, playdate/util/stackstring, strutils, sequtils
 
 suite "Stack allocated strings":
 
