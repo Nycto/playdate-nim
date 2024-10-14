@@ -1,4 +1,4 @@
-import system/ansi_c, sparsemap, ../util/stackstring
+import system/ansi_c, ../util/[stackstring, sparsemap]
 
 when defined(device):
     proc mprotect(a1: pointer, a2: int, a3: cint): cint {.inline.} = discard
