@@ -1,4 +1,4 @@
-import system/ansi_c, ../util/[stackstring, sparsemap]
+import system/ansi_c, ../util/[stackstring, sparsemap], initreqs
 
 when defined(device):
     proc mprotect(a1: pointer, a2: int, a3: cint): cint {.inline.} = discard
@@ -71,49 +71,32 @@ proc printStack[N: static int](frames: array[N, StackFrame]) =
     for i in 0..<N:
         if not frames[i].used:
             return
-        cfprintf(
-            cstderr,
-            "    %s:%i %s\n",
+        pdLog(
+            "    %s:%i %s",
             addr frames[i].filename,
             frames[i].line,
             addr frames[i].procname
         )
 
-proc printMem(p: pointer, size: Natural) =
-    let data = cast[ptr UncheckedArray[byte]](p)
-    for i in 0..<size:
-        if i == BUFFER or i == size - BUFFER:
-            cfprintf(cstderr, "\n ")
-
-        let byt = data[i]
-        if byt.int in 41..126:
-            cfprintf(cstderr, " %c", byt)
-        else:
-            cfprintf(cstderr, " %X", byt.int)
-
-    cfprintf(cstderr, "\n")
-
 proc yesNo(flag: bool): char =
     return if flag: 'y' else: 'n'
 
-proc print(alloc: Allocation, title: cstring, printMem: bool = false) =
-    cfprintf(
-        cstderr,
-        "%s (resized: %c, original size: %i, fenced: %c)\n",
+proc print(alloc: Allocation, title: cstring, printMem: bool) =
+    pdLog(
+        "%s (resized: %c, original size: %i, fenced: %c)",
         title,
         alloc.resized.yesNo,
         alloc.originalSize,
         alloc.protected.yesNo,
     )
-    cfprintf(
-        cstderr,
-        "  %p (Overall size: %i, internal size: %i)\n",
+    pdLog(
+        "  %p (Overall size: %i, internal size: %i)",
         alloc.realPointer,
         alloc.realSize,
         alloc.realSize - 2 * BUFFER
     )
     if printMem:
-        alloc.realPointer.printMem(alloc.realSize)
+        dumpMemory(alloc.realPointer, alloc.realSize, pdLog)
     alloc.stack.printStack()
 
 proc ord(p: pointer): auto = cast[uint64](p)
@@ -147,17 +130,17 @@ proc printPrior(trace: var MemTrace, p: pointer) =
             distance = pInt - thisP
 
     if distance != high(uint64):
-        found.print("Preceding allocation")
-        cfprintf(cstderr, "  Distance: %i\n", distance)
+        found.print("Preceding allocation", printMem = false)
+        pdLog("  Distance: %i", distance)
 
 proc check(trace: var MemTrace) =
     if trace.totalAllocs mod 100 == 0:
-        cfprintf(cstderr, "Allocations count: %i (active: %i)\n", trace.totalAllocs, trace.allocs.size)
+        pdLog("Allocations count: %i (active: %i)", trace.totalAllocs, trace.allocs.size)
 
     for (_, alloc) in trace.allocs:
         if not alloc.protected and not alloc.reported and isInvalid(alloc.realPointer, alloc.realSize):
             alloc.reported = true
-            alloc.print("CORRUPT! ")
+            alloc.print("CORRUPT! ", printMem = true)
             trace.printPrior(alloc.realPointer)
 
 proc memRange(alloc: Allocation): Slice[uint64] =
@@ -168,9 +151,9 @@ proc checkOverlaps(trace: var MemTrace, title: cstring, newAlloc: Allocation) =
     for (_, alloc) in trace.allocs:
         let existingRange = alloc.memRange
         if existingRange.a in newRange or existingRange.b in newRange:
-            cfprintf(cstderr, "%s overlaps with existing allocation!\n", title)
-            newAlloc.print(title)
-            alloc.print("Overlaps with:")
+            pdLog("%s overlaps with existing allocation!", title)
+            newAlloc.print(title, printMem = false)
+            alloc.print("Overlaps with:", printMem = true)
 
 proc unprotect(p: pointer, size: Natural) =
     discard mprotect(p, BUFFER, 7)
@@ -190,8 +173,8 @@ proc zeroBuffers(p: pointer, size: Natural) =
     zeroMem(p, BUFFER)
     zeroMem(p + size + BUFFER, BUFFER)
     if p.isInvalid(size.realSize):
-        cfprintf(cstderr, "Zeroing failed! ")
-        p.printMem(size.realSize)
+        pdLog("Zeroing failed! ")
+        dumpMemory(p, size.realSize, pdLog)
 
 let allocStr = "alloc".stackstring(10)
 let deallocStr = "dealloc".stackstring(10)
@@ -303,7 +286,7 @@ proc traceDealloc(trace: var MemTrace, alloc: Allocator, p: pointer) {.inline.} 
     trace.check
     let realPointer = p.input
     if realPointer.ord notin trace.allocs:
-        cfprintf(cstderr, "Attempting to dealloc unmanaged memory! %p\n", p)
+        pdLog("Attempting to dealloc unmanaged memory! %p", p)
         createStackFrame[STACK_SIZE](getFrame()).printStack()
         if realPointer.ord notin trace.deleted:
             trace.printPrior(p)

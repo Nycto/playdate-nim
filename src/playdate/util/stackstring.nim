@@ -106,3 +106,30 @@ proc appendBasename*[N: static int](str: var StackString[N], path: cstring) =
         i -= 1
     for j in (i + 1)..<len:
         str &= path[j]
+
+const DUMP_MEM_LINE_CHARS = 16
+
+template dumpMemory*(p: pointer, size: Natural, printer: untyped) =
+    var formatted: StackString[DUMP_MEM_LINE_CHARS * 6]
+    let data = cast[ptr UncheckedArray[byte]](p)
+
+    var firstChar = true
+    for i in 0..<size:
+        if i > 0 and i mod DUMP_MEM_LINE_CHARS == 0:
+            printer(formatted.cstr)
+            formatted.clear()
+            firstChar = true
+
+        if firstChar:
+            firstChar = false
+        else:
+            formatted &= ' '
+
+        let byt = data[i]
+        if byt.int in 41..126:
+            formatted &= byt.char
+        else:
+            formatted &= byt
+
+    if formatted.len > 0:
+        printer(formatted.cstr)
