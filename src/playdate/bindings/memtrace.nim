@@ -39,7 +39,17 @@ type
         totalAllocs: int
 
 proc endsWith(a, b: cstring): bool =
-    false
+    let aLen = a.len
+    let bLen = b.len
+    if aLen < bLen:
+        return false
+
+    let delta = aLen - bLen
+    for i in 0..<bLen:
+        if a[i + delta] != b[i]:
+            return false
+
+    return true
 
 proc createStackFrame[N: static int](frame: PFrame): array[N, StackFrame] =
     var current = frame
@@ -185,10 +195,19 @@ proc zeroBuffers(p: pointer, size: Natural) =
         cfprintf(cstderr, "Zeroing failed! ")
         p.printMem(size.realSize)
 
-proc record[N: static int](stack: array[N, StackFrame] = createStackFrame[N](getFrame())) {.inline.} =
+proc record[N: static int](
+    action: cstring,
+    input: pointer,
+    output: pointer,
+    size: Natural,
+    stack: array[N, StackFrame] = createStackFrame[N](getFrame())
+) {.inline.} =
     when defined(memrecord):
         let handle = fopen("memrecord.txt", "a")
         defer: fclose(handle)
+
+        cfprintf(handle, "%s,%p,%p,%i,", action, input, output, size)
+
         for i in 0..<N:
             if not stack[i].used:
                 break
@@ -221,8 +240,11 @@ proc traceAlloc(trace: var MemTrace, alloc: Allocator, size: Natural): pointer {
     trace.allocs[realPointer.ord] = entry
 
 proc alloc*(trace: var MemTrace, alloc: Allocator, size: Natural): pointer {.inline.} =
-    record[5]()
-    when defined(memtrace): return traceAlloc(trace, alloc, size) else: return alloc(nil, size.csize_t)
+    when defined(memtrace):
+        result = traceAlloc(trace, alloc, size)
+    else:
+        result = alloc(nil, size.csize_t)
+    record[5]("alloc", result, result, size)
 
 proc traceRealloc(trace: var MemTrace, alloc: Allocator, p: pointer, newSize: Natural): pointer {.inline.} =
     trace.check
@@ -253,7 +275,11 @@ proc traceRealloc(trace: var MemTrace, alloc: Allocator, p: pointer, newSize: Na
     trace.allocs[realOutPointer.ord] = entry
 
 proc realloc*(trace: var MemTrace, alloc: Allocator, p: pointer, newSize: Natural): pointer {.inline.} =
-    when defined(memtrace): return traceRealloc(trace, alloc, p, newSize) else: return alloc(p, newSize.csize_t)
+    when defined(memtrace):
+        result = traceRealloc(trace, alloc, p, newSize)
+    else:
+        result = alloc(p, newSize.csize_t)
+    record[5]("realloc", p, result, newSize)
 
 proc traceDealloc(trace: var MemTrace, alloc: Allocator, p: pointer) {.inline.} =
     trace.check
@@ -276,4 +302,5 @@ proc traceDealloc(trace: var MemTrace, alloc: Allocator, p: pointer) {.inline.} 
         trace.allocs.delete(realPointer.ord)
 
 proc dealloc*(trace: var MemTrace, alloc: Allocator, p: pointer) {.inline.} =
+    record[5]("dealloc", p, p, 0)
     when defined(memtrace): traceDealloc(trace, alloc, p) else: discard alloc(p, 0)
