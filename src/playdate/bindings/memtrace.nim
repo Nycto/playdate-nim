@@ -7,8 +7,6 @@ else:
 
 proc fopen(filename, mode: cstring): CFilePtr {.importc: "fopen", nodecl.}
 
-proc fclose(file: CFilePtr) {.importc: "fclose", nodecl.}
-
 const SLOTS = 20_000
 
 const STACK_SIZE = 12
@@ -195,28 +193,48 @@ proc zeroBuffers(p: pointer, size: Natural) =
         cfprintf(cstderr, "Zeroing failed! ")
         p.printMem(size.realSize)
 
+let allocStr = "alloc".stackstring(10)
+let deallocStr = "dealloc".stackstring(10)
+let reallocStr = "realloc".stackstring(10)
+
+var recordFile: CFilePtr
+
 proc record[N: static int](
-    action: cstring,
+    action: StackString[10],
     input: pointer,
     output: pointer,
     size: Natural,
-    stack: array[N, StackFrame] = createStackFrame[N](getFrame())
+    stackFrame: PFrame = getFrame()
 ) {.inline.} =
     when defined(memrecord):
-        let handle = fopen("memrecord.txt", "a")
-        defer: fclose(handle)
+        if recordFile == nil:
+            recordFile = fopen("memrecord.txt", "a")
 
-        cfprintf(handle, "%s,%p,%p,%i,", action, input, output, size)
+        var buffer: StackString[1000]
+        buffer &= action
+        buffer &= ','
+        buffer &= input
+        buffer &= ','
+        buffer &= output
+        buffer &= ','
+        buffer &= size.int32
+        buffer &= ','
 
+        let stack = createStackFrame[N](stackFrame)
         for i in 0..<N:
             if not stack[i].used:
                 break
             if i > 0:
-                c_fputc('|', handle)
-            discard c_fwrite(addr stack[i].filename, 1, stack[i].filename.len.csize_t, handle)
-            c_fputc(':', handle)
-            discard c_fwrite(addr stack[i].procname, 1, stack[i].procname.len.csize_t, handle)
-        c_fputc('\n', handle)
+                buffer &= '|'
+            buffer &= stack[i].filename
+            buffer &= ':'
+            buffer &= stack[i].procname
+            buffer &= ':'
+            buffer &= stack[i].line
+
+        buffer.suffix('\n')
+
+        discard c_fwrite(buffer.cstr, buffer.len.cuint, 1, recordFile)
 
 proc traceAlloc(trace: var MemTrace, alloc: Allocator, size: Natural): pointer {.inline.} =
     trace.totalAllocs += 1
@@ -244,7 +262,7 @@ proc alloc*(trace: var MemTrace, alloc: Allocator, size: Natural): pointer {.inl
         result = traceAlloc(trace, alloc, size)
     else:
         result = alloc(nil, size.csize_t)
-    record[5]("alloc", result, result, size)
+    record[5](allocStr, result, result, size)
 
 proc traceRealloc(trace: var MemTrace, alloc: Allocator, p: pointer, newSize: Natural): pointer {.inline.} =
     trace.check
@@ -279,7 +297,7 @@ proc realloc*(trace: var MemTrace, alloc: Allocator, p: pointer, newSize: Natura
         result = traceRealloc(trace, alloc, p, newSize)
     else:
         result = alloc(p, newSize.csize_t)
-    record[5]("realloc", p, result, newSize)
+    record[5](reallocStr, p, result, newSize)
 
 proc traceDealloc(trace: var MemTrace, alloc: Allocator, p: pointer) {.inline.} =
     trace.check
@@ -302,5 +320,5 @@ proc traceDealloc(trace: var MemTrace, alloc: Allocator, p: pointer) {.inline.} 
         trace.allocs.delete(realPointer.ord)
 
 proc dealloc*(trace: var MemTrace, alloc: Allocator, p: pointer) {.inline.} =
-    record[5]("dealloc", p, p, 0)
+    record[5](deallocStr, p, p, 0)
     when defined(memtrace): traceDealloc(trace, alloc, p) else: discard alloc(p, 0)
