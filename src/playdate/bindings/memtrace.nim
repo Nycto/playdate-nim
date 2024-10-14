@@ -1,6 +1,9 @@
 import system/ansi_c, sparsemap
 
-proc mprotect(a1: pointer, a2: int, a3: cint): cint {.importc, header: "<sys/mman.h>".}
+when defined(device):
+    proc mprotect(a1: pointer, a2: int, a3: cint): cint {.inline.} = discard
+else:
+    proc mprotect(a1: pointer, a2: int, a3: cint): cint {.importc, header: "<sys/mman.h>".}
 
 proc fopen(filename, mode: cstring): CFilePtr {.importc: "fopen", nodecl.}
 
