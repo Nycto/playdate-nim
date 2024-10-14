@@ -20,6 +20,8 @@ macro initSDK*() =
                 initPrereqs(
                     playdateAPI.system.realloc,
                     playdateAPI.system.logToConsole,
+                    playdateApi.file.open,
+                    playdateApi.file.write,
                 )
                 NimMain()
                 api.playdate = playdateAPI
