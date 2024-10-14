@@ -59,3 +59,7 @@ tests/playdate_tests
 
 # IntelliJ IDEA
 .idea
+
+# Memory visualizer
+bin/memvis
+*.svg
