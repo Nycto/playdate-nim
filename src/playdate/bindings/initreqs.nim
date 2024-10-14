@@ -4,7 +4,9 @@
 ##
 
 var pdrealloc*: proc (p: pointer; size: csize_t): pointer {.tags: [], raises: [], cdecl, gcsafe.}
+var pdLog*: proc (fmt: cstring) {.cdecl, varargs, raises: [].}
 
-proc initPrereqs*(realloc: auto) =
+proc initPrereqs*(realloc, log: auto) =
     ## Sets pointers to functions that are needed early in the initialization process
     pdrealloc = realloc
+    pdLog = log

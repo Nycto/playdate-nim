@@ -17,7 +17,10 @@ macro initSDK*() =
             privateAccess(PlaydateSys)
             privateAccess(PlaydateFile)
             if event == kEventInit:
-                initPrereqs(playdateAPI.system.realloc)
+                initPrereqs(
+                    playdateAPI.system.realloc,
+                    playdateAPI.system.logToConsole,
+                )
                 NimMain()
                 api.playdate = playdateAPI
             handler(event, arg)
