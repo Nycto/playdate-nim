@@ -12,9 +12,10 @@ type FileOpenProc = proc (name: cstring; mode: int): pointer {.cdecl, raises: []
 var pdrealloc*: proc (p: pointer; size: csize_t): pointer {.tags: [], raises: [], cdecl, gcsafe.}
 var pdLog*: proc (fmt: cstring) {.cdecl, varargs, raises: [].}
 var pdOpen*: FileOpenProc
+var pdClose*: proc (file: pointer): cint {.cdecl, raises: [].}
 var pdWrite*: proc (file: pointer; buf: pointer; len: cuint): cint {.cdecl, raises: [].}
 
-proc initPrereqs*(realloc, log, open, write: auto) =
+proc initPrereqs*(realloc, log, open, close, write: auto) =
     ## Sets pointers to functions that are needed early in the initialization process
     pdrealloc = realloc
     pdLog = log
