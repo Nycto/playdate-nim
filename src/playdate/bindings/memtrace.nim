@@ -168,8 +168,6 @@ let allocStr = "alloc".stackstring(10)
 let deallocStr = "dealloc".stackstring(10)
 let reallocStr = "realloc".stackstring(10)
 
-var recordFile: pointer
-
 proc stacktrace(frames: PFrame, size: static int): StackString[size] =
     var isFirst = true
     for frame in stackframes(frames):
@@ -182,6 +180,9 @@ proc stacktrace(frames: PFrame, size: static int): StackString[size] =
         var str = stringify(frame, 200)
         result &= str
 
+var recordFile: pointer = nil
+var recordBytesWritten = 0
+
 proc record[N: static int](
     action: StackString[10],
     input: pointer,
@@ -190,8 +191,6 @@ proc record[N: static int](
     frame: PFrame = getFrame()
 ) {.inline.} =
     when defined(memrecord):
-        if recordFile == nil:
-            recordFile = pdOpen("memrecord.txt", 2 shl 2)
 
         var buffer: StackString[1000]
         buffer &= action
@@ -206,7 +205,14 @@ proc record[N: static int](
 
         buffer.suffix('\n')
 
+        if recordFile == nil:
+            recordFile = pdOpen("memrecord.txt", 2 shl 2)
+
+        recordBytesWritten += buffer.len
         discard pdWrite(recordFile, buffer.cstr, buffer.len.cuint)
+
+        if recordBytesWritten > 2000:
+            assert(pdClose(recordFile) == 0)
 
 proc traceAlloc(trace: var MemTrace, alloc: Allocator, size: Natural): pointer {.inline.} =
     trace.totalAllocs += 1
