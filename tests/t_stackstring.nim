@@ -104,6 +104,18 @@ suite "Stack allocated strings":
         str &= "baz".stackstring(10)
         check(str.isFull)
 
+    test "append Basename":
+        var str: StackString[100]
+
+        str.appendBasename("/foo/bar/baz.nim")
+        check($str == "baz.nim")
+
+        str.appendBasename("")
+        check($str == "baz.nim")
+
+        str.appendBasename("blah.nim")
+        check($str == "baz.nimblah.nim")
+
     test "Memory dumping":
         var result: string
         proc addToResult(str: auto) = result &= $str

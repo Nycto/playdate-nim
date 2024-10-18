@@ -98,6 +98,15 @@ proc clear*[N: static int](str: var StackString[N]) =
     ## Clears all data out of a string
     zeroMem(addr str, sizeof(StackString[N]))
 
+proc appendBasename*[N: static int](str: var StackString[N], path: cstring) =
+    ## Appends the basename of a path to a string
+    let len = path.len
+    var i = len - 1
+    while i >= 0 and path[i] != '/':
+        i -= 1
+    for j in (i + 1)..<len:
+        str &= path[j]
+
 const DUMP_MEM_LINE_CHARS = 16
 
 template dumpMemory*(p: pointer, size: Natural, printer: untyped) =
