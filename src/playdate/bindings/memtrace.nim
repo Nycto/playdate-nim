@@ -5,9 +5,11 @@ when defined(device):
 else:
     proc mprotect(a1: pointer, a2: int, a3: cint): cint {.importc, header: "<sys/mman.h>".}
 
-const SLOTS = 20_000
+const SLOTS = 10_000
 
 const BUFFER = sizeof(byte) * 8
+
+const MEMTRACE_STACK_LEN = 80
 
 type
     Allocator* = proc (p: pointer; size: csize_t): pointer {.tags: [], raises: [], cdecl, gcsafe.}
@@ -19,7 +21,7 @@ type
         resized: bool
         originalSize: int32
         protected: bool
-        stack: StackString[500]
+        stack: StackString[MEMTRACE_STACK_LEN]
 
     MemTrace* = object
         allocs: StaticSparseMap[SLOTS, uint64, Allocation]
@@ -39,13 +41,16 @@ proc endsWith(a, b: cstring): bool =
 
     return true
 
-proc stringify(frame: PFrame, size: static int): StackString[size] =
+proc appendFrame[N: static int](output: var StackString[N], frame: PFrame, compact: static bool = false) =
     ## Convert a single PFrame to a string
-    result &= frame.filename
-    result &= ':'
-    result &= frame.line.int32
-    result &= ':'
-    result &= frame.procname
+    if compact:
+        output.appendBasename(frame.filename)
+    else:
+        output &= frame.filename
+    output &= ':'
+    output &= frame.line.int32
+    output &= ':'
+    output &= frame.procname
 
 iterator stackframes(frame: PFrame): PFrame =
     ## Walk a series of frames back to the beginning
@@ -55,10 +60,12 @@ iterator stackframes(frame: PFrame): PFrame =
             yield current
         current = current.prev
 
-proc printStack(pframe: PFrame) =
-    for stack in stackframes(pframe):
-        var str = stack.stringify(250)
-        pdLog(str.cstr)
+proc printStack(frames: PFrame) =
+    var buffer: StackString[500]
+    for frame in stackframes(frames):
+        buffer.clear
+        buffer.appendFrame(frame)
+        pdLog(buffer.cstr)
 
 proc yesNo(flag: bool): char =
     return if flag: 'y' else: 'n'
@@ -168,17 +175,16 @@ let allocStr = "alloc".stackstring(10)
 let deallocStr = "dealloc".stackstring(10)
 let reallocStr = "realloc".stackstring(10)
 
-proc stacktrace(frames: PFrame, size: static int): StackString[size] =
+proc appendStacktrace[N: static int](data: var StackString[N], frames: PFrame) =
     var isFirst = true
     for frame in stackframes(frames):
-        if isFirst:
-            isFirst = false
-        elif result.isFull:
+        if data.isFull:
             break
+        elif isFirst:
+            isFirst = false
         else:
-            result &= '|'
-        var str = stringify(frame, 200)
-        result &= str
+            data &= ';'
+        data.appendFrame(frame, compact = true)
 
 var recordFile: pointer = nil
 var recordBytesWritten = 0
@@ -192,7 +198,7 @@ proc record[N: static int](
 ) {.inline.} =
     when defined(memrecord):
 
-        var buffer: StackString[1000]
+        var buffer: StackString[500]
         buffer &= action
         buffer &= ','
         buffer &= input
@@ -201,7 +207,7 @@ proc record[N: static int](
         buffer &= ','
         buffer &= size.int32
         buffer &= ','
-        buffer &= frame.stacktrace(500)
+        buffer.appendStacktrace(frame)
 
         buffer.suffix('\n')
 
@@ -224,12 +230,8 @@ proc traceAlloc(trace: var MemTrace, alloc: Allocator, size: Natural): pointer {
     zeroBuffers(realPointer, size)
     let protected = protect(realPointer, size)
 
-    let entry = Allocation(
-        realSize: size.realSize.int32,
-        realPointer: realPointer,
-        protected: protected,
-        stack: getFrame().stacktrace(500),
-    )
+    var entry = Allocation(realSize: size.realSize.int32, realPointer: realPointer, protected: protected)
+    entry.stack.appendStacktrace(getFrame())
 
     trace.allocs[realPointer.ord] = entry
 
@@ -255,14 +257,15 @@ proc traceRealloc(trace: var MemTrace, alloc: Allocator, p: pointer, newSize: Na
 
     trace.allocs.delete(realInPointer.ord)
 
-    let entry = Allocation(
+    var entry = Allocation(
         realSize: newSize.realSize.int32,
         realPointer: realOutPointer,
-        stack: getFrame().stacktrace(500),
         resized: true,
         protected: protected,
         originalSize: origSize,
     )
+
+    entry.stack.appendStacktrace(getFrame())
 
     trace.checkOverlaps("Resized allocation", entry)
 
@@ -288,7 +291,8 @@ proc traceDealloc(trace: var MemTrace, alloc: Allocator, p: pointer) {.inline.} 
         return
     else:
         var local = trace.allocs[realPointer.ord]
-        local.stack = getFrame().stacktrace(500)
+        local.stack.clear
+        local.stack.appendStacktrace(getFrame())
 
         unprotect(realPointer, local.realSize)
         discard alloc(realPointer, 0)
