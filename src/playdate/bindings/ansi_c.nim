@@ -168,16 +168,16 @@ var
   cstdin* {.importc: stdinName, header: "<stdio.h>".}: CFilePtr
 
 proc c_fprintf*(f: CFilePtr, frmt: cstring): cint {.varargs, discardable.} =
-  pdLog("c_fprintf should not be called")
+  pdError("c_fprintf should not be called")
 
 proc c_printf*(frmt: cstring): cint {.
   importc: "printf", header: "<stdio.h>", varargs, discardable.}
 
 proc c_fputs*(c: cstring, f: CFilePtr): cint =
-  pdLog("c_fputs should not be called")
+  pdError("c_fputs should not be called")
 
 proc c_fputc*(c: char, f: CFilePtr): cint =
-  pdLog("c_fputc should not be called")
+  pdError("c_fputc should not be called")
 
 proc c_sprintf*(buf, frmt: cstring): cint {.
   importc: "sprintf", header: "<stdio.h>", varargs, noSideEffect.}
@@ -195,15 +195,15 @@ proc c_free*(p: pointer) {.error.}
 proc c_realloc*(p: pointer, newsize: csize_t): pointer {.error.}
 
 proc c_fwrite*(buf: pointer, size, n: csize_t, f: CFilePtr): csize_t =
-  pdLog("c_fwrite should not be called")
+  pdError("c_fwrite should not be called")
 
 proc c_fflush*(f: CFilePtr): cint =
-  pdLog("c_fflush should not be called")
+  pdError("c_fflush should not be called")
 
 proc rawWriteString*(f: CFilePtr, s: cstring, length: int) {.nonReloadable, inline.} =
-  pdLog("rawWriteString should not be called")
+  pdError("rawWriteString should not be called")
 
 proc rawWrite*(f: CFilePtr, s: cstring) {.nonReloadable, inline.} =
-  pdLog("rawWrite should not be called")
+  pdError("rawWrite should not be called")
 
 {.pop.}

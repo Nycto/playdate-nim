@@ -1,13 +1,18 @@
 {.push raises: [].}
 
 import macros
-import std/importutils
+import std/importutils, util/stackframe
 
 import bindings/[api, initreqs]
 export api
 
 import graphics, system, file, sprite, display, sound, scoreboards, lua, json, utils, types, nineslice
 export graphics, system, file, sprite, display, sound, scoreboards, lua, json, utils, types, nineslice
+
+proc reportInternalError(message: cstring) {.raises: [], noconv.} =
+    ## Used internally to report errors with Nim itself
+    pdLog(message)
+    printStack()
 
 macro initSDK*() =
     return quote do:
@@ -20,6 +25,7 @@ macro initSDK*() =
                 initPrereqs(
                     playdateAPI.system.realloc,
                     playdateAPI.system.logToConsole,
+                    reportInternalError,
                     playdateApi.file.open,
                     playdateApi.file.close,
                     playdateApi.file.write,

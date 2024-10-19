@@ -1,4 +1,4 @@
-import ../util/[stackstring, sparsemap], initreqs
+import ../util/[stackstring, sparsemap, stackframe], initreqs
 
 when defined(device):
     proc mprotect(a1: pointer, a2: int, a3: cint): cint {.inline.} = discard
@@ -27,45 +27,6 @@ type
         allocs: StaticSparseMap[SLOTS, uint64, Allocation]
         deleted: StaticSparseMap[SLOTS, uint64, Allocation]
         totalAllocs: int
-
-proc endsWith(a, b: cstring): bool =
-    let aLen = a.len
-    let bLen = b.len
-    if aLen < bLen:
-        return false
-
-    let delta = aLen - bLen
-    for i in 0..<bLen:
-        if a[i + delta] != b[i]:
-            return false
-
-    return true
-
-proc appendFrame[N: static int](output: var StackString[N], frame: PFrame, compact: static bool = false) =
-    ## Convert a single PFrame to a string
-    if compact:
-        output.appendBasename(frame.filename)
-    else:
-        output &= frame.filename
-    output &= ':'
-    output &= frame.line.int32
-    output &= ':'
-    output &= frame.procname
-
-iterator stackframes(frame: PFrame): PFrame =
-    ## Walk a series of frames back to the beginning
-    var current = frame
-    while current != nil:
-        if not current.filename.endsWith("/arc.nim"):
-            yield current
-        current = current.prev
-
-proc printStack(frames: PFrame) =
-    var buffer: StackString[500]
-    for frame in stackframes(frames):
-        buffer.clear
-        buffer.appendFrame(frame)
-        pdLog(buffer.cstr)
 
 proc yesNo(flag: bool): char =
     return if flag: 'y' else: 'n'
@@ -174,17 +135,6 @@ proc zeroBuffers(p: pointer, size: Natural) =
 let allocStr = "alloc".stackstring(10)
 let deallocStr = "dealloc".stackstring(10)
 let reallocStr = "realloc".stackstring(10)
-
-proc appendStacktrace[N: static int](data: var StackString[N], frames: PFrame) =
-    var isFirst = true
-    for frame in stackframes(frames):
-        if data.isFull:
-            break
-        elif isFirst:
-            isFirst = false
-        else:
-            data &= ';'
-        data.appendFrame(frame, compact = true)
 
 var recordFile: pointer = nil
 var recordBytesWritten = 0
