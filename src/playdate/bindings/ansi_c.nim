@@ -3,26 +3,34 @@
 ## https://github.com/nim-lang/Nim/blob/0a058a6b8f32749ebb19bfcd824b9f219d317f68/lib/system/ansi_c.nim
 ##
 
-import initreqs
+import initreqs, system/memory
 
 {.push hints:off, stack_trace: off, profiler: off.}
 
-proc c_memchr*(s: pointer, c: cint, n: csize_t): pointer {.
-  importc: "memchr", header: "<string.h>".}
-proc c_memcmp*(a, b: pointer, size: csize_t): cint {.
-  importc: "memcmp", header: "<string.h>", noSideEffect.}
-proc c_memcpy*(a, b: pointer, size: csize_t): pointer {.
-  importc: "memcpy", header: "<string.h>", discardable.}
-proc c_memmove*(a, b: pointer, size: csize_t): pointer {.
-  importc: "memmove", header: "<string.h>",discardable.}
-proc c_memset*(p: pointer, value: cint, size: csize_t): pointer {.
-  importc: "memset", header: "<string.h>", discardable.}
-proc c_strcmp*(a, b: cstring): cint {.
-  importc: "strcmp", header: "<string.h>", noSideEffect.}
-proc c_strlen*(a: cstring): csize_t {.
-  importc: "strlen", header: "<string.h>", noSideEffect.}
-proc c_abort*() {.
-  importc: "abort", header: "<stdlib.h>", noSideEffect, noreturn.}
+proc c_memchr*(s: pointer, c: cint, n: csize_t): pointer {.error.}
+
+proc c_memcmp*(a, b: pointer, size: csize_t): cint {.noSideEffect, inline.} =
+  nimCmpMem(a, b, size)
+
+proc c_memcpy*(a, b: pointer, size: csize_t): pointer {.discardable.} =
+  nimCopyMem(a, b, size)
+
+proc c_memmove*(a, b: pointer, size: csize_t): pointer {.discardable.} =
+  c_memcpy(a, b, size) # Yes, copymem and memmove technically have different implementations. Forgive me.
+
+proc c_memset*(p: pointer, value: cint, size: csize_t): pointer {.discardable, error.}
+
+proc c_strcmp*(a, b: cstring): cint {.noSideEffect.} =
+  var s1 = cast[uint64](a)
+  var s2 = cast[uint64](b)
+  while (cast[ptr char](s1)[] != '\0') and (cast[ptr char](s1)[] == cast[ptr char](s2)[]):
+    inc(s1)
+    inc(s2)
+  return cint(cast[ptr uint8](s1)[] - cast[ptr uint8](s2)[])
+
+proc c_strlen*(a: cstring): csize_t {.error, noSideEffect.}
+
+proc c_abort*() {.error, noSideEffect, noreturn.}
 
 
 when defined(nimBuiltinSetjmp):
@@ -152,26 +160,18 @@ proc c_signal*(sign: cint, handler: CSighandlerT): CSighandlerT {.
 proc c_raise*(sign: cint): cint {.importc: "raise", header: "<signal.h>".}
 
 type
-  CFile {.importc: "FILE", header: "<stdio.h>",
-          incompleteStruct.} = object
+  CFile {.incompleteStruct.} = object
   CFilePtr* = ptr CFile ## The type representing a file handle.
 
-# duplicated between io and ansi_c
-const stdioUsesMacros = (defined(osx) or defined(freebsd) or defined(dragonfly)) and not defined(emscripten)
-const stderrName = when stdioUsesMacros: "__stderrp" else: "stderr"
-const stdoutName = when stdioUsesMacros: "__stdoutp" else: "stdout"
-const stdinName = when stdioUsesMacros: "__stdinp" else: "stdin"
-
 var
-  cstderr* {.importc: stderrName, header: "<stdio.h>".}: CFilePtr
-  cstdout* {.importc: stdoutName, header: "<stdio.h>".}: CFilePtr
-  cstdin* {.importc: stdinName, header: "<stdio.h>".}: CFilePtr
+  cstderr*: CFilePtr
+  cstdout*: CFilePtr
+  cstdin*: CFilePtr
 
 proc c_fprintf*(f: CFilePtr, frmt: cstring): cint {.varargs, discardable.} =
   pdError("c_fprintf should not be called")
 
-proc c_printf*(frmt: cstring): cint {.
-  importc: "printf", header: "<stdio.h>", varargs, discardable.}
+proc c_printf*(frmt: cstring): cint {.error, varargs, discardable.}
 
 proc c_fputs*(c: cstring, f: CFilePtr): cint =
   pdError("c_fputs should not be called")
@@ -183,8 +183,7 @@ proc c_sprintf*(buf, frmt: cstring): cint {.
   importc: "sprintf", header: "<stdio.h>", varargs, noSideEffect.}
   # we use it only in a way that cannot lead to security issues
 
-proc c_snprintf*(buf: cstring, n: csize_t, frmt: cstring): cint {.
-  importc: "snprintf", header: "<stdio.h>", varargs, noSideEffect.}
+proc c_snprintf*(buf: cstring, n: csize_t, frmt: cstring): cint {.error, varargs, noSideEffect.}
 
 proc c_malloc*(size: csize_t): pointer {.error.}
 
