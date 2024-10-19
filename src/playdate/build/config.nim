@@ -79,6 +79,7 @@ when defined(device):
     switch("passL", "-lc -lm -lgcc")
 
     switch("d", "nimNoQuit")
+    switch("d", "nimNoLibc")
 
     if defined(release):
         switch("define", "release")
