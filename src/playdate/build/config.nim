@@ -84,6 +84,8 @@ when defined(device):
     switch("passL", "--entry eventHandlerShim")
     switch("passL", "-lc -lm -lgcc")
 
+    switch("d", "nimNoQuit")
+
     if defined(release):
         switch("define", "release")
         # Normally, one would use opt = speed, which implies O3 (optimization level 3),
