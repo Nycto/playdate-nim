@@ -56,6 +56,9 @@ switch("define", "useMalloc")
 switch("define", "standalone")
 switch("threads", "off")
 
+switch("d", "nimNoQuit")
+switch("d", "nimNoLibc")
+
 when defined(device):
     switch("gcc.options.always", "")
 
@@ -83,9 +86,6 @@ when defined(device):
     switch("passL", "-Wl,-Map=game.map,--cref,--gc-sections,--emit-relocs")
     switch("passL", "--entry eventHandlerShim")
     switch("passL", "-lc -lm -lgcc")
-
-    switch("d", "nimNoQuit")
-    switch("d", "nimNoLibc")
 
     if defined(release):
         switch("define", "release")
