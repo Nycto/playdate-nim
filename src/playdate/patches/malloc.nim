@@ -18,7 +18,7 @@
 when defined(memProfiler):
     proc nimProfile(requestedSize: int)
 
-import memtrace, initreqs
+import ../util/[memtrace, initreqs]
 import system/ansi_c
 
 var trace: MemTrace

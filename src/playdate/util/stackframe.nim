@@ -1,4 +1,4 @@
-import stackstring, ../bindings/initreqs
+import stackstring, initreqs
 
 proc endsWith(a, b: cstring): bool =
     let aLen = a.len

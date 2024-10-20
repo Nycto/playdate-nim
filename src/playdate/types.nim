@@ -1,4 +1,4 @@
-import bindings/initreqs
+import util/initreqs
 
 type SDKArrayObj[T] = object
     len: int

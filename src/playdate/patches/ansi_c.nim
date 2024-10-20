@@ -3,7 +3,7 @@
 ## https://github.com/nim-lang/Nim/blob/0a058a6b8f32749ebb19bfcd824b9f219d317f68/lib/system/ansi_c.nim
 ##
 
-import initreqs, system/memory
+import ../util/initreqs, system/memory
 
 {.push hints:off, stack_trace: off, profiler: off.}
 

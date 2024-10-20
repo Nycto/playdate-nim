@@ -1,9 +1,9 @@
 {.push raises: [].}
 
 import macros
-import std/importutils, util/stackframe
+import std/importutils, util/[stackframe, initreqs]
 
-import bindings/[api, initreqs]
+import bindings/api
 export api
 
 import graphics, system, file, sprite, display, sound, scoreboards, lua, json, utils, types, nineslice
