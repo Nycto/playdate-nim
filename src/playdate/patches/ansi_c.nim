@@ -28,7 +28,7 @@ proc c_strcmp*(a, b: cstring): cint {.noSideEffect.} =
     inc(s2)
   return cint(cast[ptr uint8](s1)[] - cast[ptr uint8](s2)[])
 
-proc c_strlen*(a: cstring): csize_t {.error, noSideEffect.}
+proc c_strlen*(a: cstring): csize_t {.noSideEffect.} = nimCStrLen(a).csize_t
 
 proc c_abort*() {.error, noSideEffect, noreturn.}
 
