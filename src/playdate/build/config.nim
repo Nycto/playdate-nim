@@ -185,3 +185,4 @@ else:
     # Overrides the nim memory management code to ensure it uses the playdate allocator
     patchFile("stdlib", "malloc", nimblePlaydatePath / "playdate/patches/malloc")
     patchFile("stdlib", "ansi_c", nimblePlaydatePath / "playdate/patches/ansi_c")
+    patchFile("stdlib", "formatfloat", nimblePlaydatePath / "playdate/patches/formatfloat")
