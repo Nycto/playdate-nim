@@ -160,13 +160,14 @@ proc c_signal*(sign: cint, handler: CSighandlerT): CSighandlerT {.
 proc c_raise*(sign: cint): cint {.importc: "raise", header: "<signal.h>".}
 
 type
-  CFile {.incompleteStruct.} = object
-  CFilePtr* = ptr CFile ## The type representing a file handle.
+  CFilePtr* = distinct uint8
 
 var
-  cstderr*: CFilePtr
-  cstdout*: CFilePtr
-  cstdin*: CFilePtr
+  cstderr*: CFilePtr = CFilePtr(1)
+  cstdout*: CFilePtr = CFilePtr(2)
+  cstdin*: CFilePtr = CFilePtr(3)
+
+proc `==`(a, b: CFilePtr): bool {.borrow.}
 
 proc c_fprintf*(f: CFilePtr, frmt: cstring): cint {.varargs, discardable.} =
   pdError("c_fprintf should not be called")
@@ -194,15 +195,26 @@ proc c_free*(p: pointer) {.error.}
 proc c_realloc*(p: pointer, newsize: csize_t): pointer {.error.}
 
 proc c_fwrite*(buf: pointer, size, n: csize_t, f: CFilePtr): csize_t =
-  pdError("c_fwrite should not be called")
+  if f == cstdout or f == cstderr:
+    pdLog("%.*s", size, buf)
+    return n
+  else:
+    pdError("c_fwrite should not be called")
 
 proc c_fflush*(f: CFilePtr): cint =
-  pdError("c_fflush should not be called")
+  if f != cstdout and f != cstderr:
+    pdError("c_fflush should not be called")
 
 proc rawWriteString*(f: CFilePtr, s: cstring, length: int) {.nonReloadable, inline.} =
-  pdError("rawWriteString should not be called")
+  if f == cstdout or f == cstderr:
+    pdLog("%.*s", s, length)
+  else:
+    pdError("rawWriteString can not write to arbitrary files")
 
 proc rawWrite*(f: CFilePtr, s: cstring) {.nonReloadable, inline.} =
-  pdError("rawWrite should not be called")
+  if f == cstdout or f == cstderr:
+    pdLog(s)
+  else:
+    pdError("rawWrite can not write to arbitrary files")
 
 {.pop.}
