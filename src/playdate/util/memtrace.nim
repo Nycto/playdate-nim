@@ -162,7 +162,7 @@ proc record[N: static int](
         buffer.suffix('\n')
 
         if recordFile == nil:
-            recordFile = pdOpen("memrecord.txt", 2 shl 2)
+            recordFile = pdOpen("memrecord.txt", pdFileModeAppend)
 
         recordBytesWritten += buffer.len
         discard pdWrite(recordFile, buffer.cstr, buffer.len.cuint)

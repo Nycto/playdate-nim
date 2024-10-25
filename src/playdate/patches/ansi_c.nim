@@ -194,10 +194,19 @@ proc c_free*(p: pointer) {.error.}
 
 proc c_realloc*(p: pointer, newsize: csize_t): pointer {.error.}
 
-proc c_fwrite*(buf: pointer, size, n: csize_t, f: CFilePtr): csize_t =
+proc c_fwrite*(buf: cstring, size, n: csize_t, f: CFilePtr): csize_t =
   if f == cstdout or f == cstderr:
-    pdLog("%.*s", size, buf)
-    return n
+
+    # pdLog automatically adds a newline, so we trim before we log
+    let logSize = if buf[size - 1] == '\n': size - 1 else: size
+    pdLog("%.*s", logSize, buf)
+
+    if f == cstderr:
+      var handle = pdOpen("/stderr.txt", pdFileModeAppend)
+      defer: discard pdClose(handle)
+      discard pdWrite(handle, buf, size.cuint)
+
+    return size
   else:
     pdError("c_fwrite should not be called")
 
@@ -206,15 +215,9 @@ proc c_fflush*(f: CFilePtr): cint =
     pdError("c_fflush should not be called")
 
 proc rawWriteString*(f: CFilePtr, s: cstring, length: int) {.nonReloadable, inline.} =
-  if f == cstdout or f == cstderr:
-    pdLog("%.*s", s, length)
-  else:
-    pdError("rawWriteString can not write to arbitrary files")
+  discard c_fwrite(s, length.csize_t, 1, f)
 
 proc rawWrite*(f: CFilePtr, s: cstring) {.nonReloadable, inline.} =
-  if f == cstdout or f == cstderr:
-    pdLog(s)
-  else:
-    pdError("rawWrite can not write to arbitrary files")
+  rawWriteString(f, s, s.len)
 
 {.pop.}

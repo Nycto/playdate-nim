@@ -16,6 +16,8 @@ var pdOpen*: FileOpenProc
 var pdClose*: proc (file: pointer): cint {.cdecl, raises: [].}
 var pdWrite*: proc (file: pointer; buf: pointer; len: cuint): cint {.cdecl, raises: [].}
 
+const pdFileModeAppend* = 2 shl 2
+
 proc initPrereqs*(realloc, log, error, open, close, write: auto) =
     ## Sets pointers to functions that are needed early in the initialization process
     pdrealloc = realloc
@@ -23,3 +25,4 @@ proc initPrereqs*(realloc, log, error, open, close, write: auto) =
     pdError = error
     pdOpen = cast[FileOpenProc](open)
     pdWrite = write
+    pdClose = close
