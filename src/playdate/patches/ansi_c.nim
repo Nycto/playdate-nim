@@ -169,8 +169,7 @@ var
 
 proc `==`(a, b: CFilePtr): bool {.borrow.}
 
-proc c_fprintf*(f: CFilePtr, frmt: cstring): cint {.varargs, discardable.} =
-  pdError("c_fprintf should not be called")
+proc c_fprintf*(f: CFilePtr, frmt: cstring): cint {.varargs, discardable, error.}
 
 proc c_printf*(frmt: cstring): cint {.error, varargs, discardable.}
 

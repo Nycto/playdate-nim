@@ -1,9 +1,6 @@
 ## This module implements formatting floats as strings.
 ## Originally pulled from: https://raw.githubusercontent.com/nim-lang/Nim/refs/heads/devel/lib/std/formatfloat.nim
 
-when defined(nimPreviewSlimSystem):
-  import std/assertions
-
 import system/ansi_c
 
 proc addCstringN(result: var string, buf: cstring; buflen: int) =
@@ -31,33 +28,10 @@ proc writeFloatToBuffer*(buf: var array[65, char]; value: BiggestFloat | float32
     writeFloatToBufferRoundtrip(buf, value)
 
 proc addFloatRoundtrip*(result: var string; x: float | float32) =
-  when nimvm:
-    raiseAssert "unreachable"
-  else:
-    var buffer {.noinit.}: array[65, char]
-    let n = writeFloatToBufferRoundtrip(buffer, x)
-    result.addCstringN(cast[cstring](buffer[0].addr), n)
+  var buffer {.noinit.}: array[65, char]
+  let n = writeFloatToBufferRoundtrip(buffer, x)
+  result.addCstringN(cast[cstring](buffer[0].addr), n)
 
 proc addFloat*(result: var string; x: float | float32) {.inline.} =
   ## Converts float to its string representation and appends it to `result`.
-  runnableExamples:
-    var
-      s = "foo:"
-      b = 45.67
-    s.addFloat(45.67)
-    assert s == "foo:45.67"
-  template impl =
-    when defined(nimLegacySprintf):
-      addFloatSprintf(result, x)
-    else:
-      addFloatRoundtrip(result, x)
-  when defined(js):
-    when nimvm: impl()
-    else:
-      result.add nimFloatToString(x)
-  else: impl()
-
-when defined(nimPreviewSlimSystem):
-  func `$`*(x: float | float32): string =
-    ## Outplace version of `addFloat`.
-    result.addFloat(x)
+  addFloatRoundtrip(result, x)
