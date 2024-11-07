@@ -14,25 +14,46 @@
 
 {.push stackTrace: off.}
 
-# Forward declaration for memory profiling support
+import ../util/initreqs
+
 when defined(memProfiler):
+
+    # Forward declaration for memory profiling support
     proc nimProfile(requestedSize: int)
 
-import ../util/[memtrace, initreqs]
-import system/ansi_c
+    template rawAlloc(size): untyped =
+        # Integrage with: https://nim-lang.org/docs/estp.html
+        try:
+            nimProfile(size.int)
+        except:
+            discard
+        pdrealloc(nil, size)
 
-var trace: MemTrace
+    template rawRealloc(p, size): untyped = pdrealloc(p, size)
+    template rawDealloc(p) = discard pdrealloc(p, 0)
+
+elif defined(memtrace):
+    import ../util/memtrace
+    var trace: MemTrace
+
+    template rawAlloc(size): untyped = alloc(trace, size)
+    template rawRealloc(p, size): untyped = realloc(trace, p, size)
+    template rawDealloc(p) = deallocTrace(trace, p)
+
+elif defined(memrecord):
+    import ../util/memrecord
+    template rawAlloc(size): untyped = recordAlloc(size)
+    template rawRealloc(p, size): untyped = recordRealloc(p, size)
+    template rawDealloc(p) = recordDealloc(p)
+
+else:
+    template rawAlloc(size): untyped = pdrealloc(nil, size)
+    template rawRealloc(p, size): untyped = pdrealloc(p, size)
+    template rawDealloc(p) = discard pdrealloc(p, 0)
 
 proc allocImpl(size: Natural): pointer =
-    # Integrage with: https://nim-lang.org/docs/estp.html
     {.cast(tags: []).}:
-        when defined(memProfiler):
-            try:
-                nimProfile(size.int)
-            except:
-                discard
-
-        return trace.alloc(pdrealloc, size.csize_t)
+        return rawAlloc(size.csize_t)
 
 proc alloc0Impl(size: Natural): pointer =
     result = allocImpl(size)
@@ -40,7 +61,7 @@ proc alloc0Impl(size: Natural): pointer =
 
 proc reallocImpl(p: pointer, newSize: Natural): pointer =
     {.cast(tags: []).}:
-        return trace.realloc(pdrealloc, p, newSize)
+        return rawRealloc(p, newSize.csize_t)
 
 proc realloc0Impl(p: pointer, oldsize, newSize: Natural): pointer =
     result = reallocImpl(p, newSize.csize_t)
@@ -49,7 +70,7 @@ proc realloc0Impl(p: pointer, oldsize, newSize: Natural): pointer =
 
 proc deallocImpl(p: pointer) =
     {.cast(tags: []).}:
-        trace.dealloc(pdrealloc, p)
+        rawDealloc(p)
 
 # The shared allocators map on the regular ones
 
