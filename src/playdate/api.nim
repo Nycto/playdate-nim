@@ -1,7 +1,7 @@
 {.push raises: [].}
 
 import macros
-import std/importutils, util/[stackframe, initreqs]
+import std/importutils, util/[initreqs]
 
 import bindings/api
 export api
@@ -12,7 +12,6 @@ export graphics, system, file, sprite, display, sound, scoreboards, lua, json, u
 proc reportInternalError(message: cstring) {.raises: [], noconv.} =
     ## Used internally to report errors with Nim itself
     pdLog(message)
-    printStack()
 
 macro initSDK*() =
     return quote do:
