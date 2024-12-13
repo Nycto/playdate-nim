@@ -16,9 +16,16 @@
 
 import ../util/initreqs
 
-proc rawAlloc(size: Natural): pointer {.inline.} = pdrealloc(nil, size.csize_t)
-proc rawRealloc(p: pointer, size: Natural): pointer {.inline.} = pdrealloc(p, size.csize_t)
-proc rawDealloc(p: pointer) {.inline.} = discard pdrealloc(p, 0)
+when defined(mempool):
+    import ../util/mempool
+    proc rawAlloc(size: Natural): pointer {.inline.} = poolAlloc(pdrealloc, size)
+    proc rawDealloc(p: pointer) {.inline.} = poolDealloc(pdrealloc, p)
+    proc rawRealloc(p: pointer, size: Natural): pointer {.inline.} = poolRealloc(pdrealloc, p, size)
+
+else:
+    proc rawAlloc(size: Natural): pointer {.inline.} = pdrealloc(nil, size.csize_t)
+    proc rawRealloc(p: pointer, size: Natural): pointer {.inline.} = pdrealloc(p, size.csize_t)
+    proc rawDealloc(p: pointer) {.inline.} = discard pdrealloc(p, 0)
 
 when defined(memProfiler):
 

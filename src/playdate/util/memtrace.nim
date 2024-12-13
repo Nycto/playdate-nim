@@ -1,4 +1,4 @@
-import ../util/[stackstring, sparsemap, stackframe], initreqs
+import ../util/[stackstring, sparsemap, stackframe, pointerMath], initreqs
 
 when defined(device):
     proc mprotect(a1: pointer, a2: int, a3: cint): cint {.inline.} = discard
@@ -47,12 +47,6 @@ proc print(alloc: Allocation, title: cstring, printMem: bool) =
 
     if printMem:
         dumpMemory(alloc.realPointer, alloc.realSize, pdLog)
-
-proc ord(p: pointer): auto = cast[uint64](p)
-
-proc `+`(a: pointer, b: Natural): pointer = cast[pointer](cast[uint64](a) + b.uint64)
-
-proc `-`(a: pointer, b: Natural): pointer = cast[pointer](cast[uint64](a) - b.uint64)
 
 proc input(p: pointer): pointer = p - BUFFER
 
