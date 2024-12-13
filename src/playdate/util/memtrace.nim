@@ -130,11 +130,11 @@ proc zeroBuffers(p: pointer, size: Natural) =
         pdLog("Zeroing failed! ")
         dumpMemory(p, size.realSize, pdLog)
 
-proc alloc*(trace: var MemTrace, size: Natural): pointer {.inline.} =
+proc allocTrace*(trace: var MemTrace, size: Natural, alloc: auto): pointer {.inline.} =
     trace.totalAllocs += 1
     trace.check
 
-    let realPointer = pdrealloc(nil, size.realSize.csize_t)
+    let realPointer = alloc(size.realSize.csize_t)
     result = realPointer.output
 
     zeroBuffers(realPointer, size)
@@ -145,14 +145,14 @@ proc alloc*(trace: var MemTrace, size: Natural): pointer {.inline.} =
 
     trace.allocs[realPointer.ord] = entry
 
-proc realloc*(trace: var MemTrace, p: pointer, newSize: Natural): pointer {.inline.} =
+proc reallocTrace*(trace: var MemTrace, p: pointer, newSize: Natural, realloc: auto): pointer {.inline.} =
     trace.check
 
     let realInPointer = p.input
     let origSize = trace.allocs[realInPointer.ord].realSize
     unprotect(realInPointer, origSize)
 
-    let realOutPointer = pdrealloc(realInPointer, newSize.realSize.csize_t)
+    let realOutPointer = realloc(realInPointer, newSize.realSize.csize_t)
     result = realOutPointer.output
 
     zeroBuffers(realOutPointer, newSize)
@@ -174,7 +174,7 @@ proc realloc*(trace: var MemTrace, p: pointer, newSize: Natural): pointer {.inli
 
     trace.allocs[realOutPointer.ord] = entry
 
-proc deallocTrace*(trace: var MemTrace, p: pointer) {.inline.} =
+proc deallocTrace*(trace: var MemTrace, p: pointer, dealloc: auto) {.inline.} =
     trace.check
     let realPointer = p.input
     if realPointer.ord notin trace.allocs:
@@ -191,6 +191,6 @@ proc deallocTrace*(trace: var MemTrace, p: pointer) {.inline.} =
         local.stack.appendStacktrace(getFrame())
 
         unprotect(realPointer, local.realSize)
-        discard pdrealloc(realPointer, 0)
+        dealloc(realPointer)
         trace.deleted[realPointer.ord] = local
         trace.allocs.delete(realPointer.ord)

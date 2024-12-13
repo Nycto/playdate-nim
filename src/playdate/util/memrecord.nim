@@ -37,14 +37,14 @@ proc record[N: static int](
     if recordBytesWritten > 2000:
         assert(pdClose(recordFile) == 0)
 
-proc recordAlloc*(size: Natural): pointer {.inline.} =
-    result = pdrealloc(nil, size.csize_t)
+proc recordAlloc*(size: Natural, alloc: auto): pointer {.inline.} =
+    result = alloc(size.csize_t)
     record[5](allocStr, result, result, size)
 
-proc recordRealloc*(p: pointer, newSize: Natural): pointer {.inline.} =
-    result = pdrealloc(p, newSize.csize_t)
+proc recordRealloc*(p: pointer, newSize: Natural, realloc: auto): pointer {.inline.} =
+    result = realloc(p, newSize.csize_t)
     record[5](reallocStr, p, result, newSize)
 
-proc recordDealloc*(p: pointer) {.inline.} =
+proc recordDealloc*(p: pointer, dealloc: auto) {.inline.} =
     record[5](deallocStr, p, p, 0)
-    discard pdrealloc(p, 0)
+    dealloc(p)

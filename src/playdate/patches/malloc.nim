@@ -16,44 +16,47 @@
 
 import ../util/initreqs
 
+proc rawAlloc(size: Natural): pointer {.inline.} = pdrealloc(nil, size.csize_t)
+proc rawRealloc(p: pointer, size: Natural): pointer {.inline.} = pdrealloc(p, size.csize_t)
+proc rawDealloc(p: pointer) {.inline.} = discard pdrealloc(p, 0)
+
 when defined(memProfiler):
 
     # Forward declaration for memory profiling support
     proc nimProfile(requestedSize: int)
 
-    template rawAlloc(size): untyped =
+    proc doAlloc(size: Natural): pointer =
         # Integrage with: https://nim-lang.org/docs/estp.html
         try:
             nimProfile(size.int)
         except:
             discard
-        pdrealloc(nil, size)
+        return rawAlloc(size)
 
-    template rawRealloc(p, size): untyped = pdrealloc(p, size)
-    template rawDealloc(p) = discard pdrealloc(p, 0)
+    proc doRealloc(p: pointer, size: Natural): pointer = rawRealloc(p, size)
+    proc doDealloc(p: pointer) = rawDealloc(p)
 
 elif defined(memtrace):
     import ../util/memtrace
     var trace: MemTrace
-
-    template rawAlloc(size): untyped = alloc(trace, size)
-    template rawRealloc(p, size): untyped = realloc(trace, p, size)
-    template rawDealloc(p) = deallocTrace(trace, p)
+    proc doAlloc(size: Natural): pointer = allocTrace(trace, size, rawAlloc)
+    proc doRealloc(p: pointer, size: Natural): pointer = reallocTrace(trace, p, size, rawRealloc)
+    proc doDealloc(p: pointer) = deallocTrace(trace, p, rawDealloc)
 
 elif defined(memrecord):
     import ../util/memrecord
-    template rawAlloc(size): untyped = recordAlloc(size)
-    template rawRealloc(p, size): untyped = recordRealloc(p, size)
-    template rawDealloc(p) = recordDealloc(p)
+    proc doAlloc(size: Natural): pointer = recordAlloc(size, rawAlloc)
+    proc doRealloc(p: pointer, size: Natural): pointer = recordRealloc(p, size, rawRealloc)
+    proc doDealloc(p: pointer) = recordDealloc(p, rawDealloc)
 
 else:
-    template rawAlloc(size): untyped = pdrealloc(nil, size)
-    template rawRealloc(p, size): untyped = pdrealloc(p, size)
-    template rawDealloc(p) = discard pdrealloc(p, 0)
+    proc doAlloc(size: Natural): pointer = rawAlloc(size)
+    proc doRealloc(p: pointer, size: Natural): pointer = rawRealloc(p, size)
+    proc doDealloc(p: pointer) = rawDealloc(p)
 
 proc allocImpl(size: Natural): pointer =
     {.cast(tags: []).}:
-        return rawAlloc(size.csize_t)
+        return doAlloc(size.csize_t)
 
 proc alloc0Impl(size: Natural): pointer =
     result = allocImpl(size)
@@ -61,7 +64,7 @@ proc alloc0Impl(size: Natural): pointer =
 
 proc reallocImpl(p: pointer, newSize: Natural): pointer =
     {.cast(tags: []).}:
-        return rawRealloc(p, newSize.csize_t)
+        return doRealloc(p, newSize.csize_t)
 
 proc realloc0Impl(p: pointer, oldsize, newSize: Natural): pointer =
     result = reallocImpl(p, newSize.csize_t)
@@ -70,7 +73,7 @@ proc realloc0Impl(p: pointer, oldsize, newSize: Natural): pointer =
 
 proc deallocImpl(p: pointer) =
     {.cast(tags: []).}:
-        rawDealloc(p)
+        doDealloc(p)
 
 # The shared allocators map on the regular ones
 
