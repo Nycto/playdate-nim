@@ -114,7 +114,7 @@ when defined(simulator):
     if not testing:
         # Switching to a lib build makes tests not work.
         switch("app", "lib")
-    
+
     if defined(macosx):
         switch("cc", "clang")
         switch("passC", "-arch x86_64 -arch arm64")
@@ -127,7 +127,7 @@ when defined(simulator):
         switch("define", "mingw")
         switch("cc", "gcc")
         switch("passC", "-D_WINDLL=1")
-    
+
     switch("checks", "on")
     switch("index", "on")
     switch("debuginfo", "on")
@@ -146,7 +146,7 @@ if useHostOS or nimbleTesting:
     # Compiling for host system environment.
     switch("define", "simulator")
     switch("nimcache", nimcacheDir() / "simulator")
-    
+
     if defined(macosx):
         switch("cc", "clang")
         switch("passC", "-arch x86_64 -arch arm64")
@@ -159,7 +159,7 @@ if useHostOS or nimbleTesting:
         switch("define", "mingw")
         switch("cc", "gcc")
         switch("passC", "-D_WINDLL=1")
-    
+
     switch("checks", "on")
     switch("index", "on")
     switch("debuginfo", "on")
@@ -183,6 +183,4 @@ else:
         switch("compile", sdkPath() / "C_API" / "buildsupport" / "setup.c")
 
     # Overrides the nim memory management code to ensure it uses the playdate allocator
-    patchFile("stdlib", "malloc", nimblePlaydatePath / "playdate/patches/malloc")
-    patchFile("stdlib", "ansi_c", nimblePlaydatePath / "playdate/patches/ansi_c")
-    patchFile("stdlib", "formatfloat", nimblePlaydatePath / "playdate/patches/formatfloat")
+    patchFile("stdlib", "malloc", nimblePlaydatePath / "playdate/bindings/malloc")
