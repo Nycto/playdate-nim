@@ -1,4 +1,4 @@
-import std/[unittest, strutils, streams], playdate/build/[pdxinfo, nimbledump]
+import std/[unittest, strutils, streams, options], playdate/build/[pdxinfo, nimbledump]
 
 suite "Pdxinfo generation":
 
@@ -56,12 +56,16 @@ suite "Pdxinfo generation":
             imagePath: "launcher",
             version: "1.2.3",
             buildNumber: "20250216",
+            launchSoundPath: some("foo"),
+            contentWarning2: some("above"),
         )
 
         let pdx2 = PdxInfo(
             author: "Twas Brillig",
             bundleId: "com.twasbrillig.loremipsum",
             version: "3.4.5",
+            contentWarning: some("look out"),
+            contentWarning2: some("below"),
         )
 
         check($join(pdx1, pdx2) == """
@@ -72,4 +76,7 @@ suite "Pdxinfo generation":
             imagePath=launcher
             version=3.4.5
             buildNumber=20250216
+            launchSoundPath=foo
+            contentWarning=look out
+            contentWarning2=below
             """.dedent())
