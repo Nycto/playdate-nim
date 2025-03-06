@@ -78,7 +78,7 @@ proc updateConfig(conf: PlaydateConf) =
 
     "configs.nims".fileAppend(fmt"\n\n# Added by pdn\nimport {configFile}\n")
 
-proc configureBuild*(conf: PlaydateConf) =
+proc configureBuild(conf: PlaydateConf) =
     if not conf.noAutoConfig:
         conf.updateConfig
         echo "Writing pdxinfo"
@@ -107,7 +107,7 @@ proc rmdir(target: string) =
 
 proc simulatorBuild*(conf: PlaydateConf) =
     ## Performs a build for running on the simulator
-
+    conf.configureBuild()
     conf.nimble("build", "-d:simulator", "-d:debug")
 
     if defined(windows):
@@ -139,7 +139,7 @@ proc runSimulator*(conf: PlaydateConf) =
 
 proc deviceBuild*(conf: PlaydateConf) =
     ## Performs a build for running on device
-
+    conf.configureBuild()
     conf.nimble("build", "-d:device", "-d:release")
 
     let artifact = when defined(windows): conf.dump.name & ".exe" else: conf.dump.name
