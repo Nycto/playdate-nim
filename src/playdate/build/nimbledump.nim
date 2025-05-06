@@ -4,6 +4,7 @@ type
     NimbleDump* = ref object
         ## The data pulled from running `nimble dump --json`
         name*, version*, nimblePath*, author*, desc*, license*: string
+        entryPoints*: seq[string]
 
 proc getNimbleDump*(): NimbleDump =
     ## Executes nimble with the given set of arguments
