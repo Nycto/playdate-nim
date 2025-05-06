@@ -9,7 +9,7 @@ type
         sdkPath*, pdxName*: string
         nimbleArgs*: seq[string]
         dump*: NimbleDump
-        noAutoConfig*: bool
+        noAutoConfig*, nimDirect*: bool
 
 proc exec*(command: string, args: varargs[string]) =
     ## Executes nimble with the given set of arguments
@@ -21,12 +21,15 @@ proc exec*(command: string, args: varargs[string]) =
     if process.waitForExit() != 0:
         raise BuildFail.newException(fmt"Command failed: {command} {args}")
 
-proc nimble*(conf: PlaydateConf, args: varargs[string]) =
+proc build*(conf: PlaydateConf, args: varargs[string]) =
     ## Executes nimble with the given set of arguments
-    exec(
-        "nimble",
-        @[ "-d:playdateSdkPath=" & conf.sdkPath ].concat(conf.nimbleArgs).concat(args.toSeq)
-    )
+    let baseArgs =
+        @["-d:playdateSdkPath=" & conf.sdkPath].concat(conf.nimbleArgs).concat(args.toSeq)
+    if conf.nimDirect:
+        let entryPoints = conf.dump.entryPoints.filterIt(it.fileExists)
+        exec("nim", @["c"].concat(baseArgs).concat(entryPoints))
+    else:
+        exec("nimble", @["build"].concat(baseArgs))
 
 proc pdcPath*(conf: PlaydateConf): string =
     ## Returns the path of the pdc playdate utility
@@ -108,8 +111,7 @@ proc rmdir(target: string) =
 proc simulatorBuild*(conf: PlaydateConf) =
     ## Performs a build for running on the simulator
     conf.configureBuild()
-    conf.nimble("build", "-d:simulator", "-d:debug")
-
+    conf.build("-d:simulator", "-d:debug")
     if defined(windows):
         mv(conf.dump.name & ".exe", "source" / "pdex.dll")
     elif defined(macosx):
@@ -140,8 +142,7 @@ proc runSimulator*(conf: PlaydateConf) =
 proc deviceBuild*(conf: PlaydateConf) =
     ## Performs a build for running on device
     conf.configureBuild()
-    conf.nimble("build", "-d:device", "-d:release")
-
+    conf.build("-d:device", "-d:release")
     let artifact = when defined(windows): conf.dump.name & ".exe" else: conf.dump.name
     mv(artifact, "source" / "pdex.elf")
     rm("game.map")

@@ -22,6 +22,7 @@ proc parseConf(kind: BuildKind, options: auto): PlaydateConf =
         kind: kind,
         sdkPath: sdkPath(options.read(sdkPath, string)),
         pdxName: dump.name & ".pdx",
+        nimDirect: options.read(nim, bool),
         nimbleArgs: options.read(others, seq[string]),
         noAutoConfig: options.read(noAutoConfig, bool)
     )
@@ -30,6 +31,7 @@ proc sharedOptions() =
     ## Adds CLI options shared across multiple kinds of builds
     option("--sdk-path", help = "Specifies the location of the Playdate SDK")
     flag("--no-auto-config", help = "Disables editing of config.nims, pdxinfo and .gitignore")
+    flag("--nim", help = "Calls the nim compiler directly instead of using nimble")
 
 template defineBuild(name: string, kind: BuildKind, action: untyped, helpMessage: string) =
     ## Defines a subcommand that performs a build
