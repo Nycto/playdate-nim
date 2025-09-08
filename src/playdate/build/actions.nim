@@ -11,6 +11,10 @@ type
         dump*: NimbleDump
         noAutoConfig*, nimDirect*: bool
 
+proc resolvePdx(conf: PlaydateConf): PdxInfo =
+  ## Returns the resolved pdxinfo content
+  conf.dump.toPdxInfo.join(readPdx("./pdxinfo"))
+
 proc exec*(command: string, args: varargs[string]) =
     ## Executes nimble with the given set of arguments
     let process = startProcess(
@@ -23,8 +27,16 @@ proc exec*(command: string, args: varargs[string]) =
 
 proc build*(conf: PlaydateConf, args: varargs[string]) =
     ## Executes nimble with the given set of arguments
-    let baseArgs =
-        @["-d:playdateSdkPath=" & conf.sdkPath].concat(conf.nimbleArgs).concat(args.toSeq)
+    let pdx = conf.resolvePdx()
+    let baseArgs = @[
+      "-d:playdateSdkPath=" & conf.sdkPath.quoteShell,
+      "-d:pdxName=" & pdx.name.quoteShell,
+      "-d:pdxAuthor=" & pdx.author.quoteShell,
+      "-d:pdxDescription=" & pdx.description.quoteShell,
+      "-d:pdxBundleId=" & pdx.bundleId.quoteShell,
+      "-d:pdxVersion=" & pdx.version.quoteShell,
+      "-d:pdxBuildNumber=" & pdx.buildNumber.quoteShell
+    ].concat(conf.nimbleArgs).concat(args.toSeq)
     if conf.nimDirect:
         let entryPoints = conf.dump.entryPoints.filterIt(it.fileExists)
         exec("nim", @["c"].concat(baseArgs).concat(entryPoints))
@@ -85,7 +97,7 @@ proc configureBuild(conf: PlaydateConf) =
     if not conf.noAutoConfig:
         conf.updateConfig
         echo "Writing pdxinfo"
-        conf.dump.toPdxInfo.join(readPdx("./pdxinfo")).write
+        conf.resolvePdx().write
         echo "Updating gitignore"
         conf.updateGitIgnore
 
