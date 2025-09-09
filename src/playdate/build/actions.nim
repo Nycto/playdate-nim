@@ -23,7 +23,8 @@ proc exec*(command: string, args: varargs[string]) =
         options = {poUsePath, poParentStreams, poEchoCmd}
     )
     if process.waitForExit() != 0:
-        raise BuildFail.newException(fmt"Command failed: {command} {args}")
+        let joinedArgs = args.join(" ")
+        raise BuildFail.newException(fmt"Command failed: {command} {joinedArgs}")
 
 proc build*(conf: PlaydateConf, args: varargs[string]) =
     ## Executes nimble with the given set of arguments

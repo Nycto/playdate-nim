@@ -68,3 +68,5 @@ try:
     p.run()
 except UsageError as e:
     quit(e.msg, 1)
+except BuildFail as e:
+    quit(e.msg, 1)
