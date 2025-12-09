@@ -121,18 +121,22 @@ proc rmdir(target: string) =
     echo fmt"Removing {target}"
     removeDir(target)
 
+proc artifactName(conf: PlaydateConf): string =
+    ## Returns the artifact name returned by the build
+    if defined(windows): conf.dump.name & ".exe" else: conf.dump.name
+
 proc simulatorBuild*(conf: PlaydateConf) =
     ## Performs a build for running on the simulator
     conf.configureBuild()
-    conf.build("-d:simulator", "-d:debug")
+    conf.build("-d:simulator", "-d:debug", "-o:" & conf.artifactName)
     if defined(windows):
-        mv(conf.dump.name & ".exe", "source" / "pdex.dll")
+        mv(conf.artifactName, "source" / "pdex.dll")
     elif defined(macosx):
-        mv(conf.dump.name, "source" / "pdex.dylib")
+        mv(conf.artifactName, "source" / "pdex.dylib")
         rmdir("source" / "pdex.dSYM")
         mv(conf.dump.name & ".dSYM", "source" / "pdex.dSYM")
     elif defined(linux):
-        mv(conf.dump.name, "source" / "pdex.so")
+        mv(conf.artifactName, "source" / "pdex.so")
     else:
         raise BuildFail.newException(fmt"Unsupported host platform")
 
@@ -155,9 +159,8 @@ proc runSimulator*(conf: PlaydateConf) =
 proc deviceBuild*(conf: PlaydateConf) =
     ## Performs a build for running on device
     conf.configureBuild()
-    conf.build("-d:device", "-d:release")
-    let artifact = when defined(windows): conf.dump.name & ".exe" else: conf.dump.name
-    mv(artifact, "source" / "pdex.elf")
+    conf.build("-d:device", "-d:release", "-o:" & conf.artifactName)
+    mv(conf.artifactName, "source" / "pdex.elf")
     rm("game.map")
 
     conf.bundlePDX()
