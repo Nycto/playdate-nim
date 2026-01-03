@@ -1,104 +1,89 @@
 name: Build
 on: [push, pull_request]
 jobs:
-
   compile-example-project-macos:
     runs-on: macos-14
     steps:
-    - uses: actions/checkout@v3
-    - uses: ./.github/actions/macos-build-setup
-      with:
-        nim-version: 2.0.8
-    - uses: ./.github/actions/project-setup
-      with:
+      - uses: actions/checkout@v3
+      - uses: ./.github/actions/build-setup
+      - run: nimble install --depsOnly --accept
         working-directory: ./playdate_example
-    - run: pdn simulator
-      working-directory: ./playdate_example
+      - run: pdn simulator
+        working-directory: ./playdate_example
 
   example-project:
     strategy:
       matrix:
-        target: [ device, simulator ]
-        nim-version: [ 2.0.8 ]
+        target: [device, simulator]
     runs-on: ubuntu-latest
-    container: nimlang/choosenim
     steps:
-    - uses: actions/checkout@v3
-    - uses: ./.github/actions/build-setup
-      with:
-        nim-version: ${{ matrix.nim-version }}
-    - uses: ./.github/actions/project-setup
-      with:
-        working-directory: ./playdate_example
-    - run: pdn ${{ matrix.target }}
-      working-directory: ./playdate_example
+      - uses: actions/checkout@v3
 
-    - run: grep "name=Playdate Example" ./playdate_example/source/pdxinfo
-    - run: grep "bundleId=com.samuelezolfanelli.playdate_example" ./playdate_example/source/pdxinfo
-    - run: grep "version=" ./playdate_example/source/pdxinfo
-    - run: grep "buildNumber=" ./playdate_example/source/pdxinfo
+      - uses: ./.github/actions/build-setup
+
+      - run: nimble install --depsOnly --accept
+        working-directory: ./playdate_example
+
+      - run: pdn ${{ matrix.target }}
+        working-directory: ./playdate_example
+
+      - run: grep "name=Playdate Example" ./playdate_example/source/pdxinfo
+      - run: grep "bundleId=com.samuelezolfanelli.playdate_example" ./playdate_example/source/pdxinfo
+      - run: grep "version=" ./playdate_example/source/pdxinfo
+      - run: grep "buildNumber=" ./playdate_example/source/pdxinfo
 
   tests:
     runs-on: ubuntu-latest
-    container: nimlang/choosenim
-    strategy:
-      matrix:
-        nim-version: [ 2.0.8 ]
     steps:
-    - uses: actions/checkout@v3
-    - uses: ./.github/actions/build-setup
-      with:
-        nim-version: ${{ matrix.nim-version }}
-    - run: nimble test
+      - uses: actions/checkout@v3
+      - uses: ./.github/actions/build-setup
+      - run: nimble test
 
   headless-tests:
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    container: nimlang/choosenim
     strategy:
       matrix:
-        nim-version: [ 2.0.8 ]
-        build-flags: [ noflag, memProfiler, memtrace, memrecord ]
+        build-flags: [noflag, memProfiler, memtrace, memrecord]
     steps:
+      - uses: actions/checkout@v3
 
-    - uses: actions/checkout@v3
+      - uses: ./.github/actions/build-setup
 
-    - uses: ./.github/actions/build-setup
-      with:
-        nim-version: ${{ matrix.nim-version }}
-
-    - uses: ./.github/actions/project-setup
-      with:
+      - run: nimble install --depsOnly --accept
         working-directory: ./tests
 
-    - name: Install dependencies
-      run: apt-get install -y xvfb libgtk-3-0 sudo libwebkit2gtk-4.0 libwebkit2gtk-4.0-dev libsdl2-dev pulseaudio
+      - name: Install dependencies
+        run: sudo apt-get install -y xvfb libgtk-3-0 sudo libwebkit2gtk-4.1-dev libsdl2-dev pulseaudio
 
-      # Because we are headless there is no audio driver to interact with by default, which causes a set
-      # of warnings to be emitted. This set of commands sets up a dummy audio sink that silences those warnings.
-    - name: Setup audio sink
-      run: |
-        export HOME="/config"
-        pulseaudio -D --exit-idle-time=-1
-        pactl load-module module-null-sink sink_name=SpeakerOutput sink_properties=device.description="Dummy_Output"
+        # Because we are headless there is no audio driver to interact with by default, which causes a set
+        # of warnings to be emitted. This set of commands sets up a dummy audio sink that silences those warnings.
+      - name: Setup audio sink
+        run: |
+          export HOME="/config"
+          pulseaudio -D --exit-idle-time=-1
+          pactl load-module module-null-sink sink_name=SpeakerOutput sink_properties=device.description="Dummy_Output"
 
-    - run: pdn simulator -d:${{ matrix.build-flags }}
-      working-directory: ./tests
+      - run: pdn simulator -d:${{ matrix.build-flags }}
+        working-directory: ./tests
 
-      # The first time the simulator runs, it prompts the user with an alert. Obviously, we're running headless,
-      # so this prevents the tests from running without closing that alert. Creating this ini file will stop that
-      # alert from showing in the first place
-    - name: Create simulator ini
-      run: |
-        export PD_INI_DIR="/config/.config/Playdate Simulator"
-        mkdir -p "$PD_INI_DIR"
-        export PD_INI_FILE="$PD_INI_DIR/Playdate Simulator.ini"
-        echo "ShowPerfWarning=0" > $PD_INI_FILE
-        echo "ShowElist=0" >> $PD_INI_FILE
-        echo "LastRelease=$(cat PlaydateSDK-*/VERSION.txt)" >> $PD_INI_FILE
+        # The first time the simulator runs, it prompts the user with an alert. Obviously, we're running headless,
+        # so this prevents the tests from running without closing that alert. Creating this ini file will stop that
+        # alert from showing in the first place
+      - name: Create simulator ini
+        shell: bash
+        run: |
+          PD_INI_DIR="/config/.config/Playdate Simulator"
+          sudo mkdir -p "$PD_INI_DIR"
+          sudo chown -R $(whoami) "$PD_INI_DIR"
 
-    - name: Run headless test
-      working-directory: ./tests
-      run: |
-        export HOME="/config"
-        xvfb-run ../PlaydateSDK-*/bin/PlaydateSimulator playdate_tests.pdx
+          PD_INI_FILE="$PD_INI_DIR/Playdate Simulator.ini"
+          echo "ShowPerfWarning=0" > "$PD_INI_FILE"
+          echo "ShowElist=0" >> "$PD_INI_FILE"
+          echo "LastRelease=$(cat PlaydateSDK-*/VERSION.txt)" >> "$PD_INI_FILE"
+
+      - name: Run headless test
+        working-directory: ./tests
+        run: |
+          export HOME="/config"
+          xvfb-run PlaydateSimulator playdate_tests.pdx
