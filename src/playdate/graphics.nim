@@ -381,7 +381,7 @@ proc height*(this: LCDBitmap): int = this.getSize.height
 proc setBitmapMask*(
     this: LCDBitmap,
     mask: LCDBitmap = playdate.graphics.newBitmap(this.width, this.height, kColorWhite)
-): int =
+): int {.discardable.} =
     privateAccess(PlaydateGraphics)
     return playdate.graphics.setBitmapMask(this.resource, mask.resource).int
 
