@@ -4,8 +4,11 @@
 ## exit from the simulator.
 ##
 
-import playdate/api
+import playdate/api, std/unittest
 import ../[ t_system, t_buttons, t_graphics, t_nineslice, t_files, t_midi, t_scoreboards]
+
+# Force the tests to fail with an error code on a test failure
+abortOnError = true
 
 proc runTests() {.raises: [].} =
     try:

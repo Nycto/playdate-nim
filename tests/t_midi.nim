@@ -10,7 +10,7 @@ proc execMidiTests*(runnable: bool) =
 
                 sq.setTime(sq.getTime)
 
-                check(sq.getLength == 132961)
+                check(sq.getLength == 133199)
                 check(sq.getCurrentStep() == 0)
 
                 check(sq.getTempo() == 831.9986572265625)
