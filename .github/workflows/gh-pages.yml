@@ -14,9 +14,14 @@ jobs:
       - run: git config --global --add safe.directory "$(pwd)"
       - run: nimble -y doc --index:on --out:docs --project src/playdate/api.nim
       - run: cp docs/api.html docs/index.html
+      - name: Print environment variables
+        run: |
+          echo "ACT: ${{ env.ACT }}"
+          echo "Ref: ${{ github.ref }}"
+          echo "Repository: ${{ github.repository }}"
       - name: Deploy documents
         uses: peaceiris/actions-gh-pages@v3
-        if: ${{ !env.ACT && github.ref == 'refs/heads/main' }}
+        if: ${{ !env.ACT && github.ref == 'refs/heads/main' && github.repository == 'samdze/playdate-nim' }}
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: docs
