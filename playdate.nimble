@@ -1,12 +1,12 @@
 # Package
 
-version       = "0.22.0"
-author        = "Samuele Zolfanelli"
-description   = "Playdate Nim bindings with extra features."
-license       = "MIT"
-srcDir        = "src"
-installExt    = @["nim"]
-bin           = @["pdn"]
+version = "0.22.0"
+author = "Samuele Zolfanelli"
+description = "Playdate Nim bindings with extra features."
+license = "MIT"
+srcDir = "src"
+installExt = @["nim"]
+bin = @["pdn"]
 
 # Dependencies
 

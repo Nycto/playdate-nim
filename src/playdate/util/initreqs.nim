@@ -13,7 +13,7 @@ var pdrealloc*: PDRealloc
 var pdlog*: PDLog
 
 proc initPrereqs*(realloc: PDRealloc, log: PDLog) =
-    ## Sets pointers to functions from the playdate stdlib that are needed to initialize Nim integrations
-    log("Initializing Nim playdate globals")
-    pdrealloc = realloc
-    pdlog = log
+  ## Sets pointers to functions from the playdate stdlib that are needed to initialize Nim integrations
+  log("Initializing Nim playdate globals")
+  pdrealloc = realloc
+  pdlog = log
