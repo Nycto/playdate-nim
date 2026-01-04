@@ -3,7 +3,7 @@
 import bindings/types
 
 template toC*(str: typed): untyped =
-    cast[Char](str)
+  cast[Char](str)
 
 template compilerInfo*(): untyped =
-    instantiationInfo()
+  instantiationInfo()

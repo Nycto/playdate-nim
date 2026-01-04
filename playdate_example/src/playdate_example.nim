@@ -6,7 +6,8 @@ const PLAYDATE_NIM_IMAGE_PATH = "/images/playdate_nim"
 const BACKGROUND_MUSIC_PATH = "/audio/finally_see_the_light"
 const BACKGROUND_MUSIC_SAMPLE_RATE = 48_000
 const BACKGROUND_MUSIC_FADE_IN_SECONDS = 4.0
-const BACKGROUND_MUSIC_FADE_IN_SAMPLES = (BACKGROUND_MUSIC_SAMPLE_RATE * BACKGROUND_MUSIC_FADE_IN_SECONDS).int32
+const BACKGROUND_MUSIC_FADE_IN_SAMPLES =
+  (BACKGROUND_MUSIC_SAMPLE_RATE * BACKGROUND_MUSIC_FADE_IN_SECONDS).int32
 
 var font: LCDFont
 
@@ -22,140 +23,160 @@ var x = int(LCD_COLUMNS / 2)
 var y = int(LCD_ROWS / 2) + 32
 
 proc update(): int =
-    # playdate is the global PlaydateAPI instance, available when playdate/api is imported
-    let buttonState = playdate.system.getButtonState()
+  # playdate is the global PlaydateAPI instance, available when playdate/api is imported
+  let buttonState = playdate.system.getButtonState()
 
-    if kButtonRight in buttonState.current:
-        x += 10
-    if kButtonLeft in buttonState.current:
-        x -= 10
-    if kButtonUp in buttonState.current:
-        y -= 10
-    if kButtonDown in buttonState.current:
-        y += 10
+  if kButtonRight in buttonState.current:
+    x += 10
+  if kButtonLeft in buttonState.current:
+    x -= 10
+  if kButtonUp in buttonState.current:
+    y -= 10
+  if kButtonDown in buttonState.current:
+    y += 10
 
-    if kButtonA in buttonState.pushed:
-        samplePlayer.play(1, 1.0)
+  if kButtonA in buttonState.pushed:
+    samplePlayer.play(1, 1.0)
 
-    let goalX = x.toFloat
-    let goalY = y.toFloat
-    let res = sprite.moveWithCollisions(goalX, goalY)
-    x = res.actualX.int
-    y = res.actualY.int
-    if res.collisions.len > 0:
-        # fmt allows the "{variable}" syntax for formatting strings
-        playdate.system.logToConsole(fmt"{res.collisions.len} collision(s) occurred!")
+  let goalX = x.toFloat
+  let goalY = y.toFloat
+  let res = sprite.moveWithCollisions(goalX, goalY)
+  x = res.actualX.int
+  y = res.actualY.int
+  if res.collisions.len > 0:
+    # fmt allows the "{variable}" syntax for formatting strings
+    playdate.system.logToConsole(fmt"{res.collisions.len} collision(s) occurred!")
 
-    playdate.sprite.drawSprites()
-    playdate.system.drawFPS(0, 0)
+  playdate.sprite.drawSprites()
+  playdate.system.drawFPS(0, 0)
 
-    playdate.graphics.setDrawMode(kDrawModeNXOR)
-    playdate.graphics.drawText("Playdate Nim!", 1, 12)
+  playdate.graphics.setDrawMode(kDrawModeNXOR)
+  playdate.graphics.drawText("Playdate Nim!", 1, 12)
 
-    playdate.graphics.setDrawMode(kDrawModeCopy)
-    playdateNimBitmap.draw(22, 65, kBitmapUnflipped)
+  playdate.graphics.setDrawMode(kDrawModeCopy)
+  playdateNimBitmap.draw(22, 65, kBitmapUnflipped)
 
-    return 1
+  return 1
 
 import std/json
 type
-    Equip = ref object
-        name: string
-        damage: int
-    Entity = ref object
-        name: string
-        enemy: bool
-        health: int
-        equip: seq[Equip]
+  Equip = ref object
+    name: string
+    damage: int
+
+  Entity = ref object
+    name: string
+    enemy: bool
+    health: int
+    equip: seq[Equip]
 
 # This is the application entrypoint and event handler
 proc handler(event: PDSystemEvent, keycode: uint) {.raises: [].} =
-    if event == kEventInit:
-        playdate.display.setRefreshRate(50)
-        # Enables the accelerometer even if it's not used here
-        playdate.system.setPeripheralsEnabled(kAllPeripherals)
+  if event == kEventInit:
+    playdate.display.setRefreshRate(50)
+    # Enables the accelerometer even if it's not used here
+    playdate.system.setPeripheralsEnabled(kAllPeripherals)
 
-        # Errors are handled through exceptions
-        try:
-            samplePlayer = playdate.sound.newSamplePlayer("/audio/jingle")
+    # Errors are handled through exceptions
+    try:
+      samplePlayer = playdate.sound.newSamplePlayer("/audio/jingle")
 
-            samplePlayer.finishCallback = proc(player: SamplePlayer) =
-                playdate.system.logToConsole("Sound finished playing.")
-        except:
-            playdate.system.logToConsole(getCurrentExceptionMsg())
-        # Inline try/except
-        filePlayer = try: playdate.sound.newFilePlayer(BACKGROUND_MUSIC_PATH) except: nil
+      samplePlayer.finishCallback = proc(player: SamplePlayer) =
+        playdate.system.logToConsole("Sound finished playing.")
+    except:
+      playdate.system.logToConsole(getCurrentExceptionMsg())
+    # Inline try/except
+    filePlayer =
+      try:
+        playdate.sound.newFilePlayer(BACKGROUND_MUSIC_PATH)
+      except:
+        nil
 
-        filePlayer.play(0)
-        fileplayer.volume = 0.0 # first set folume to 0%
-        filePlayer.fadeVolume(1.0, 1.0, BACKGROUND_MUSIC_FADE_IN_SAMPLES, nil) # then fade to 100%
+    filePlayer.play(0)
+    fileplayer.volume = 0.0 # first set folume to 0%
+    filePlayer.fadeVolume(1.0, 1.0, BACKGROUND_MUSIC_FADE_IN_SAMPLES, nil)
+      # then fade to 100%
 
-        # Add a checkmark menu item that plays a sound when switched and unpaused
-        discard playdate.system.addCheckmarkMenuItem("Checkmark", false,
-            proc(menuItem: PDMenuItemCheckmark) =
-                samplePlayer.play(1, 1.0)
-        )
+    # Add a checkmark menu item that plays a sound when switched and unpaused
+    discard playdate.system.addCheckmarkMenuItem(
+      "Checkmark",
+      false,
+      proc(menuItem: PDMenuItemCheckmark) =
+        samplePlayer.play(1, 1.0),
+    )
 
-        font = try: playdate.graphics.newFont(FONT_PATH) except: nil
-        playdate.graphics.setFont(font)
+    font =
+      try:
+        playdate.graphics.newFont(FONT_PATH)
+      except:
+        nil
+    playdate.graphics.setFont(font)
 
-        playdateNimBitmap = try: playdate.graphics.newBitmap(PLAYDATE_NIM_IMAGE_PATH) except: nil
-        nimLogoBitmap = try: playdate.graphics.newBitmap(NIM_IMAGE_PATH) except: nil
+    playdateNimBitmap =
+      try:
+        playdate.graphics.newBitmap(PLAYDATE_NIM_IMAGE_PATH)
+      except:
+        nil
+    nimLogoBitmap =
+      try:
+        playdate.graphics.newBitmap(NIM_IMAGE_PATH)
+      except:
+        nil
 
-        sprite = playdate.sprite.newSprite()
-        sprite.add()
-        sprite.moveTo(x.float, y.float)
-        sprite.setImage(nimLogoBitmap, kBitmapUnflipped)
-        sprite.collideRect = PDRect(x: 0, y: 12, width: 64, height: 40)
-        # Slide when a collision occurs
-        sprite.setCollisionResponseFunction(
-            proc(sprite, other: LCDSprite): auto =
-                kCollisionTypeSlide
-        )
+    sprite = playdate.sprite.newSprite()
+    sprite.add()
+    sprite.moveTo(x.float, y.float)
+    sprite.setImage(nimLogoBitmap, kBitmapUnflipped)
+    sprite.collideRect = PDRect(x: 0, y: 12, width: 64, height: 40)
+    # Slide when a collision occurs
+    sprite.setCollisionResponseFunction(
+      proc(sprite, other: LCDSprite): auto =
+        kCollisionTypeSlide
+    )
 
-        # Create screen walls
-        let sprite1 = playdate.sprite.newSprite()
-        sprite1.add()
-        sprite1.moveTo(0, -1)
-        sprite1.collideRect = PDRect(x: 0, y: 0, width: 400, height: 1)
-        sprite1.collisionsEnabled = true
+    # Create screen walls
+    let sprite1 = playdate.sprite.newSprite()
+    sprite1.add()
+    sprite1.moveTo(0, -1)
+    sprite1.collideRect = PDRect(x: 0, y: 0, width: 400, height: 1)
+    sprite1.collisionsEnabled = true
 
-        let sprite2 = playdate.sprite.newSprite()
-        sprite2.add()
-        sprite2.moveTo(400, 0)
-        sprite2.collideRect = PDRect(x: 0, y: 0, width: 1, height: 240)
+    let sprite2 = playdate.sprite.newSprite()
+    sprite2.add()
+    sprite2.moveTo(400, 0)
+    sprite2.collideRect = PDRect(x: 0, y: 0, width: 1, height: 240)
 
-        let sprite3 = playdate.sprite.newSprite()
-        sprite3.add()
-        sprite3.moveTo(-1, 0)
-        sprite3.collideRect = PDRect(x: 0, y: 0, width: 1, height: 240)
+    let sprite3 = playdate.sprite.newSprite()
+    sprite3.add()
+    sprite3.moveTo(-1, 0)
+    sprite3.collideRect = PDRect(x: 0, y: 0, width: 1, height: 240)
 
-        let sprite4 = playdate.sprite.newSprite()
-        sprite4.add()
-        sprite4.moveTo(0, 240)
-        sprite4.collideRect = PDRect(x: 0, y: 0, width: 400, height: 1)
+    let sprite4 = playdate.sprite.newSprite()
+    sprite4.add()
+    sprite4.moveTo(0, 240)
+    sprite4.collideRect = PDRect(x: 0, y: 0, width: 400, height: 1)
 
-        try:
-            # Decode a JSON string to an object, type safe!
-            let jsonString = playdate.file.open("/json/data.json", kFileRead).readString()
-            let obj = parseJson(jsonString).to(Entity)
-            playdate.system.logToConsole(fmt"JSON decoded: {obj.repr}")
-            # Encode an object to a JSON string, %* is the encode operator
-            playdate.system.logToConsole(fmt"JSON encoded: {(%* obj).pretty}")
+    try:
+      # Decode a JSON string to an object, type safe!
+      let jsonString = playdate.file.open("/json/data.json", kFileRead).readString()
+      let obj = parseJson(jsonString).to(Entity)
+      playdate.system.logToConsole(fmt"JSON decoded: {obj.repr}")
+      # Encode an object to a JSON string, %* is the encode operator
+      playdate.system.logToConsole(fmt"JSON encoded: {(%* obj).pretty}")
 
-            let faultyString = playdate.file.open("/json/error.json", kFileRead).readString()
-            # This generates an exception
-            discard parseJson(faultyString).to(Entity)
-        except:
-            playdate.system.logToConsole("This below is an expected error:")
-            playdate.system.logToConsole(getCurrentExceptionMsg())
+      let faultyString = playdate.file.open("/json/error.json", kFileRead).readString()
+      # This generates an exception
+      discard parseJson(faultyString).to(Entity)
+    except:
+      playdate.system.logToConsole("This below is an expected error:")
+      playdate.system.logToConsole(getCurrentExceptionMsg())
 
-        # Log any serial messages we receive
-        playdate.system.setSerialMessageCallback do (msg: string) -> void:
-            playdate.system.logToConsole(fmt"Serial message: {msg}")
+    # Log any serial messages we receive
+    playdate.system.setSerialMessageCallback do(msg: string) -> void:
+      playdate.system.logToConsole(fmt"Serial message: {msg}")
 
-        # Set the update callback
-        playdate.system.setUpdateCallback(update)
+    # Set the update callback
+    playdate.system.setUpdateCallback(update)
 
 # Used to setup the SDK entrypoint
 initSDK()

@@ -13,65 +13,71 @@ import bindings/lua {.all.}
 
 type LuaError* = object of CatchableError
 
-proc addFunction*(this: ptr PlaydateLua, function: LuaNimFunction, name: string) {.raises: [LuaError]} =
-    privateAccess(PlaydateLua)
-    var err: ConstChar = nil
-    var success = this.addFunction(function, name.cstring, addr(err))
-    if success == 0:
-        raise newException(LuaError, $err)
+proc addFunction*(
+    this: ptr PlaydateLua, function: LuaNimFunction, name: string
+) {.raises: [LuaError].} =
+  privateAccess(PlaydateLua)
+  var err: ConstChar = nil
+  var success = this.addFunction(function, name.cstring, addr(err))
+  if success == 0:
+    raise newException(LuaError, $err)
 
 # registerClass
 
 # indexMetatable
 
 proc getArgCount*(this: ptr PlaydateLua): int =
-    privateAccess(PlaydateLua)
-    return this.getArgCount().int
+  privateAccess(PlaydateLua)
+  return this.getArgCount().int
 
-proc getArgType*(this: ptr PlaydateLua, position: int): LuaType {.raises: [LuaError]} =
-    privateAccess(PlaydateLua)
-    if position < 1 or position > this.getArgCount():
-        raise newException(LuaError, "Invalid argument index " & $position & ".")
-    var cls: ConstChar = nil
-    return this.getArgType(position.cint, addr(cls))
+proc getArgType*(this: ptr PlaydateLua, position: int): LuaType {.raises: [LuaError].} =
+  privateAccess(PlaydateLua)
+  if position < 1 or position > this.getArgCount():
+    raise newException(LuaError, "Invalid argument index " & $position & ".")
+  var cls: ConstChar = nil
+  return this.getArgType(position.cint, addr(cls))
 
-proc getArgClass*(this: ptr PlaydateLua, position: int): string {.raises: [LuaError]} =
-    privateAccess(PlaydateLua)
-    if position < 1 or position > this.getArgCount():
-        raise newException(LuaError, "Invalid argument index " & $position & ".")
-    var cls: ConstChar = nil
-    discard this.getArgType(position.cint, addr(cls))
-    return $cls
+proc getArgClass*(this: ptr PlaydateLua, position: int): string {.raises: [LuaError].} =
+  privateAccess(PlaydateLua)
+  if position < 1 or position > this.getArgCount():
+    raise newException(LuaError, "Invalid argument index " & $position & ".")
+  var cls: ConstChar = nil
+  discard this.getArgType(position.cint, addr(cls))
+  return $cls
 
-proc argIsNil*(this: ptr PlaydateLua, position: int): bool {.raises: [LuaError]} =
-    privateAccess(PlaydateLua)
-    if position < 1 or position > this.getArgCount():
-        raise newException(LuaError, "Invalid argument index " & $position & ".")
-    return this.argIsNil(position.cint) > 0
+proc argIsNil*(this: ptr PlaydateLua, position: int): bool {.raises: [LuaError].} =
+  privateAccess(PlaydateLua)
+  if position < 1 or position > this.getArgCount():
+    raise newException(LuaError, "Invalid argument index " & $position & ".")
+  return this.argIsNil(position.cint) > 0
 
-proc getArgBool*(this: ptr PlaydateLua, position: int): bool {.raises: [LuaError]} =
-    privateAccess(PlaydateLua)
-    if position < 1 or position > this.getArgCount():
-        raise newException(LuaError, "Invalid argument index " & $position & ".")
-    return this.getArgBool(position.cint) > 0
+proc getArgBool*(this: ptr PlaydateLua, position: int): bool {.raises: [LuaError].} =
+  privateAccess(PlaydateLua)
+  if position < 1 or position > this.getArgCount():
+    raise newException(LuaError, "Invalid argument index " & $position & ".")
+  return this.getArgBool(position.cint) > 0
 
-proc getArgFloat*(this: ptr PlaydateLua, position: int): float32 {.raises: [LuaError]} =
-    privateAccess(PlaydateLua)
-    if position < 1 or position > this.getArgCount():
-        raise newException(LuaError, "Invalid argument index " & $position & ".")
-    return this.getArgFloat(position.cint).float32
+proc getArgFloat*(
+    this: ptr PlaydateLua, position: int
+): float32 {.raises: [LuaError].} =
+  privateAccess(PlaydateLua)
+  if position < 1 or position > this.getArgCount():
+    raise newException(LuaError, "Invalid argument index " & $position & ".")
+  return this.getArgFloat(position.cint).float32
 
-proc getArgInt*(this: ptr PlaydateLua, position: int): int {.raises: [LuaError]} =
-    privateAccess(PlaydateLua)
-    if position < 1 or position > this.getArgCount():
-        raise newException(LuaError, "Invalid argument index " & $position & ".")
-    return this.getArgInt(position.cint).int
+proc getArgInt*(this: ptr PlaydateLua, position: int): int {.raises: [LuaError].} =
+  privateAccess(PlaydateLua)
+  if position < 1 or position > this.getArgCount():
+    raise newException(LuaError, "Invalid argument index " & $position & ".")
+  return this.getArgInt(position.cint).int
 
-proc getArgString*(this: ptr PlaydateLua, position: int): string {.raises: [LuaError]} =
-    privateAccess(PlaydateLua)
-    if position < 1 or position > this.getArgCount():
-        raise newException(LuaError, "Invalid argument index " & $position & ".")
-    return $this.getArgString(position.cint)
+proc getArgString*(
+    this: ptr PlaydateLua, position: int
+): string {.raises: [LuaError].} =
+  privateAccess(PlaydateLua)
+  if position < 1 or position > this.getArgCount():
+    raise newException(LuaError, "Invalid argument index " & $position & ".")
+  return $this.getArgString(position.cint)
 
 # getArgBytes
 
@@ -82,20 +88,20 @@ proc getArgString*(this: ptr PlaydateLua, position: int): string {.raises: [LuaE
 # getSprite
 
 proc pushBool*(this: ptr PlaydateLua, value: bool) =
-    privateAccess(PlaydateLua)
-    this.pushBool(if value: 1 else: 0)
+  privateAccess(PlaydateLua)
+  this.pushBool(if value: 1 else: 0)
 
 proc pushInt*(this: ptr PlaydateLua, value: int) =
-    privateAccess(PlaydateLua)
-    this.pushInt(value.cint)
+  privateAccess(PlaydateLua)
+  this.pushInt(value.cint)
 
 proc pushFloat*(this: ptr PlaydateLua, value: float32) =
-    privateAccess(PlaydateLua)
-    this.pushFloat(value.cfloat)
+  privateAccess(PlaydateLua)
+  this.pushFloat(value.cfloat)
 
 proc pushString*(this: ptr PlaydateLua, value: string) =
-    privateAccess(PlaydateLua)
-    this.pushString(value.cstring)
+  privateAccess(PlaydateLua)
+  this.pushString(value.cstring)
 
 # pushBytes
 
@@ -113,10 +119,12 @@ proc pushString*(this: ptr PlaydateLua, value: string) =
 
 # getUserValue
 
-proc callFunction*(this: ptr PlaydateLua, name: string, argsCount: int = 0) {.raises: [LuaError]} =
-    privateAccess(PlaydateLua)
-    privateAccess(PlaydateSys)
-    var err: ConstChar = nil
-    var success = this.callFunction(name.cstring, argsCount.cint, addr(err))
-    if success == 0:
-        raise newException(LuaError, $err)
+proc callFunction*(
+    this: ptr PlaydateLua, name: string, argsCount: int = 0
+) {.raises: [LuaError].} =
+  privateAccess(PlaydateLua)
+  privateAccess(PlaydateSys)
+  var err: ConstChar = nil
+  var success = this.callFunction(name.cstring, argsCount.cint, addr(err))
+  if success == 0:
+    raise newException(LuaError, $err)
