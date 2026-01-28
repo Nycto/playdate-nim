@@ -381,17 +381,17 @@ proc get*(view: BitmapView, x, y: int): LCDSolidColor =
   else:
     kColorBlack
 
-proc set*(view: var BitmapView, x, y: int) =
+func set*(view: BitmapView, x, y: int) =
   ## Sets the pixel at x, y to black.
   if view.isInView(x, y):
     view.read(x, y) = view.read(x, y) and not viewBit(x)
 
-proc clear*(view: var BitmapView, x, y: int) =
+func clear*(view: BitmapView, x, y: int) =
   ## Clears the color from a pixel at the given coordinate.
   if view.isInView(x, y):
     view.read(x, y) = view.read(x, y) or viewBit(x)
 
-proc set*(view: var BitmapView, x, y: int, color: LCDSolidColor) =
+func set*(view: BitmapView, x, y: int, color: LCDSolidColor) =
   ## Sets the specific color of a pixel at the given coordinate.
   if (color == kColorBlack):
     set(view, x, y)
@@ -484,7 +484,7 @@ proc get*(this: LCDBitmap, x, y: int): LCDSolidColor =
   else:
     return this.getData.get(x, y)
 
-proc set*(this: var LCDBitmap, x, y: int, color: LCDSolidColor = kColorBlack) =
+proc set*(this: LCDBitmap, x, y: int, color: LCDSolidColor = kColorBlack) =
   ## Reads the color of a bitmap, taking into account the color mask
   if color == kColorClear:
     var mask = this.getBitmapMask.getData
