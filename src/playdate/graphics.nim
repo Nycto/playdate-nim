@@ -479,22 +479,19 @@ proc getBitmapMask*(this: LCDBitmap): LCDBitmap =
 proc get*(this: LCDBitmap, x, y: int): LCDSolidColor =
   ## Reads the color of a bitmap, taking into account the color mask
   if this.getBitmapMask.resource != nil and
-      this.getBitmapMask.getData.get(x, y) == kColorBlack:
+      this.getBitmapMask.getDataObj.get(x, y) == kColorBlack:
     return kColorClear
   else:
-    return this.getData.get(x, y)
+    return this.getDataObj.get(x, y)
 
 proc set*(this: LCDBitmap, x, y: int, color: LCDSolidColor = kColorBlack) =
   ## Reads the color of a bitmap, taking into account the color mask
   if color == kColorClear:
-    var mask = this.getBitmapMask.getData
-    mask.set(x, y, kColorBlack)
+    this.getBitmapMask.getDataObj.set(x, y, kColorBlack)
   else:
     if this.getBitmapMask.resource != nil:
-      var mask = this.getBitmapMask.getData
-      mask.set(x, y, kColorWhite)
-    var data = this.getData
-    data.set(x, y, color)
+      this.getBitmapMask.getDataObj.set(x, y, kColorWhite)
+    this.getDataObj.set(x, y, color)
 
 proc setStencilImage*(
     this: ptr PlaydateGraphics, bitmap: LCDBitmap, tile: bool = false
