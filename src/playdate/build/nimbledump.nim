@@ -6,8 +6,13 @@ type NimbleDump* = ref object ## The data pulled from running `nimble dump --jso
 
 proc getNimbleDump*(): NimbleDump =
   ## Executes nimble with the given set of arguments
-  let (output, exitCode) = execCmdEx("nimble dump --json")
+  let (output, exitCode) = execCmdEx("nimble dump --legacy --json")
   if exitCode != 0:
     echo output
     raise BuildFail.newException(fmt"Unable to extract nimble dump for package")
-  return parseJson(output).jsonTo(NimbleDump, Joptions(allowExtraKeys: true))
+  try:
+    return parseJson(output).jsonTo(NimbleDump, Joptions(allowExtraKeys: true))
+  except CatchableError as e:
+    echo fmt"Unable to parse nimble dump: {e.msg}"
+    echo output
+    raise BuildFail.newException("Failed to parse nimble dump output")
