@@ -126,6 +126,8 @@ proc newNineSlice*(source: LCDBitmap): NineSlice =
 func overlapBytes(left, right: uint8, offset: int): uint8 =
   ## Given two bytes, creates a new byte that is partially made up of the left byte, and partially made up of
   ## the right hand byte. The amount taken from each is determined by the `offset`
+  if offset == 0:
+    return right
   let leftContribution = left shl (8 - offset)
   let rightContribution = right shr offset
   result = leftContribution or rightContribution
@@ -151,7 +153,10 @@ func drawRow(target: var BitmapData, source: NineSliceRow, targetY: int) =
   let rightColStartByte = (target.width - source.leftRightBitLen) div 8
   let overlapBits = (target.width - source.leftRightBitLen) mod 8
   var existingByte =
-    target.data[targetOffsetByte + rightColStartByte] shr (8 - overlapBits)
+    if overlapBits == 0:
+      0u8
+    else:
+      target.data[targetOffsetByte + rightColStartByte] shr (8 - overlapBits)
   for i in 0 .. (imageWidthInBytes - rightColStartByte):
     let rightByte = source.rightBytes[min(i, source.rightBytes.len - 1)]
     target.data[targetOffsetByte + rightColStartByte + i] =
