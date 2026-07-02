@@ -1,6 +1,7 @@
 {.push raises: [].}
 
 import std/importutils
+import std/streams
 
 import utils
 import bindings/[api, types]
@@ -8,6 +9,7 @@ import bindings/file
 
 # Only export public symbols, then import all
 export file
+export streams
 {.hint[DuplicateModuleImport]: off.}
 import bindings/file {.all.}
 
@@ -17,6 +19,11 @@ type
     path: string
 
   SDFile* = ref SDFileObj
+
+  PDFileStreamObj = object of Stream
+    file: SDFile
+
+  PDFileStream = ref PDFileStreamObj
 
 proc requireValidStatus(res: SomeInteger): int {.raises: [IOError], discardable.} =
   privateAccess(PlaydateFile)
@@ -130,3 +137,64 @@ proc write*(this: SDFile, content: string): int {.raises: [IOError], discardable
   privateAccess(PlaydateFile)
   if content.len > 0:
     return playdate.file.write(this.resource, unsafeAddr(content[0]), content.len.cuint).requireValidStatus
+
+proc pdfsClose(s: Stream) {.raises: [IOError], tags: [WriteIOEffect], gcsafe.} =
+  {.cast(tags: []).}:
+    PDFileStream(s).file.close()
+
+proc pdfsFlush(s: Stream) {.raises: [IOError], tags: [WriteIOEffect], gcsafe.} =
+  {.cast(tags: []).}:
+    discard PDFileStream(s).file.flush()
+
+proc pdfsAtEnd(s: Stream): bool {.raises: [IOError], tags: [], gcsafe.} =
+  let this = PDFileStream(s)
+  {.cast(tags: []).}:
+    result = this.file.tell() >= playdate.file.stat(this.file.path).size.int
+
+proc pdfsGetPosition(s: Stream): int {.raises: [IOError], tags: [], gcsafe.} =
+  {.cast(tags: []).}:
+    result = PDFileStream(s).file.tell()
+
+proc pdfsSetPosition(s: Stream, pos: int) {.raises: [IOError], tags: [], gcsafe.} =
+  {.cast(tags: []).}:
+    PDFileStream(s).file.seek(pos, SEEK_SET)
+
+proc pdfsReadData(s: Stream, buffer: pointer, bufLen: int): int {.raises: [IOError], tags: [ReadIOEffect], gcsafe.} =
+  let this = PDFileStream(s)
+  if bufLen > 0:
+    privateAccess(PlaydateFile)
+    {.cast(tags: []).}:
+      result =
+        playdate.file.read(this.file.resource, buffer, bufLen.cuint).requireValidStatus
+
+proc pdfsPeekData(s: Stream, buffer: pointer, bufLen: int): int {.raises: [IOError], tags: [ReadIOEffect], gcsafe.} =
+  let this = PDFileStream(s)
+  var pos: int
+  {.cast(tags: []).}:
+    pos = this.file.tell()
+  result = pdfsReadData(s, buffer, bufLen)
+  {.cast(tags: []).}:
+    this.file.seek(pos, SEEK_SET)
+
+proc pdfsWriteData(s: Stream, buffer: pointer, bufLen: int) {.raises: [IOError], tags: [WriteIOEffect], gcsafe.} =
+  let this = PDFileStream(s)
+  if bufLen > 0:
+    privateAccess(PlaydateFile)
+    {.cast(tags: []).}:
+      discard playdate.file.write(this.file.resource, buffer, bufLen.cuint).requireValidStatus
+
+proc toStream*(this: SDFile): Stream {.raises: [].} =
+  ## Wraps an open `SDFile` in a `std/streams` `Stream`, so it can be used
+  ## with the generic stream reading/writing procs (`readLine`, `readAll`,
+  ## `write`, `readInt32`, etc).
+  PDFileStream(
+    file: this,
+    closeImpl: pdfsClose,
+    flushImpl: pdfsFlush,
+    atEndImpl: pdfsAtEnd,
+    getPositionImpl: pdfsGetPosition,
+    setPositionImpl: pdfsSetPosition,
+    readDataImpl: pdfsReadData,
+    peekDataImpl: pdfsPeekData,
+    writeDataImpl: pdfsWriteData,
+  )
